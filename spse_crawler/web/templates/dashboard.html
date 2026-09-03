@@ -1,0 +1,3008 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPSE Inaproc — Tender Dashboard</title>
+  <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+  <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 5px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .tab-active { border-bottom: 2px solid #2563eb; color: #1e40af; font-weight: 600; }
+    .sidebar-section + .sidebar-section { border-top: 1px solid #e2e8f0; }
+    input[type="checkbox"]:accent-color: #2563eb;
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { border: 2px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.7s linear infinite; display: inline-block; }
+    @keyframes progressPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .progress-pulse { animation: progressPulse 1.5s ease-in-out infinite; }
+    .progress-bar-fill { transition: width 0.4s ease-in-out; }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .sidebar-desktop { display: none !important; }
+      .mobile-header { display: flex !important; }
+      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table-scroll table { min-width: 800px; }
+      .top-nav-controls { flex-wrap: wrap; gap: 0.5rem; }
+      .top-nav-controls .relative { width: 100%; }
+      .top-nav-controls .relative input { width: 100%; }
+      .pagination-controls { flex-wrap: wrap; justify-content: center; }
+      .modal-detail-body { grid-template-columns: 1fr !important; }
+    }
+    @media (min-width: 769px) {
+      .mobile-only { display: none !important; }
+    }
+  </style>
+</head>
+<body class="h-full overflow-hidden">
+
+<div class="flex h-full">
+
+  <!-- ===== LEFT SIDEBAR ===== -->
+  <aside class="sidebar-desktop w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
+
+    <!-- Logo -->
+    <div class="px-5 py-4 border-b border-slate-200">
+      <div class="flex items-center gap-2">
+        <img src="{% static 'img/logo.png' %}" alt="SPSE Inaproc Logo" class="w-8 h-8 rounded-lg object-contain">
+        <div>
+          <h1 class="text-sm font-bold text-slate-800 leading-tight">SPSE Inaproc</h1>
+          <p class="text-[10px] text-slate-400 leading-tight">Tender Intelligence Dashboard</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Counter -->
+    <div class="px-5 py-3 border-b border-slate-200 bg-slate-50">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Total Paket</div>
+      <div class="text-2xl font-bold text-slate-800" id="total-count-sidebar">0</div>
+    </div>
+
+    <!-- HPS Range Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Kisaran Nilai HPS</div>
+      <div class="space-y-1.5" id="hps-filters">
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="" checked class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Semua</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-all">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="gt10m" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">&gt; 10 Miliar</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-gt10m">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="5m_10m" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">5 - 10 Miliar</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-5m_10m">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="2m_5m" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">2 - 5 Miliar</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-2m_5m">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="1m_2m" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">1 - 2 Miliar</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-1m_2m">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="500j_1m" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">500 Jt - 1 Miliar</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-500j_1m">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="200j_500j" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">200 - 500 Jt</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-200j_500j">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="hps_range" value="lt200j" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">&lt; 200 Juta</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-lt200j">0</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Jenis Pengadaan Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Jenis Pengadaan</div>
+      <div class="space-y-1.5" id="jenis-filters">
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="jenis" value="" checked class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Semua</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-all">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="jenis" value="Pekerjaan Konstruksi" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pekerjaan Konstruksi</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-konstruksi">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="jenis" value="Jasa Konsultansi" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Jasa Konsultansi</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-konsultansi">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="jenis" value="Pengadaan Barang" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pengadaan Barang</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-barang">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="jenis" value="Jasa Lainnya" class="w-3.5 h-3.5" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Jasa Lainnya</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-lainnya">0</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- KBLI / Sub-Bidang Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">KBLI / Sub-Bidang</div>
+      <div class="space-y-1.5" id="kbli-filters">
+        {% for code, name in kbli_items %}
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="kbli_code" value="{{ code }}" class="kbli-cb w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1 truncate" title="{{ code }} — {{ name }}">{{ code }} — {{ name|truncatechars:30 }}</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="kbli-count-{{ code }}">0</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="mt-3 pt-3 border-t border-slate-200/50">
+        <button onclick="openKbliModal()" class="w-full text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1.5 transition">
+          <span>&#9881;</span> Kelola KBLI
+        </button>
+      </div>
+    </div>
+
+    <!-- Tahapan / Status Tahap Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Tahapan</div>
+      <div class="space-y-1.5" id="tahapan-filters">
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="tahapan" value="Pra-Kualifikasi" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pra-Kualifikasi</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-prakualifikasi">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="tahapan" value="Pengumuman" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pengumuman</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-pengumuman">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="tahapan" value="Evaluasi" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Evaluasi</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-evaluasi">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="tahapan" value="Penawaran" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Penawaran</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-penawaran">0</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="checkbox" name="tahapan" value="Lainnya" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
+          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Lainnya</span>
+          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-lainnya">0</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Lokasi Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Lokasi Pekerjaan</div>
+      <input id="filter-location" type="text" placeholder="Contoh: Jakarta, Bandung..."
+        oninput="debouncedApplyFilters()"
+        class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    </div>
+
+    <!-- Deadline Filter -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Deadline</div>
+      <div class="space-y-2">
+        <div>
+          <label class="text-[9px] text-slate-400">Sebelum</label>
+          <input id="filter-deadline-before" type="date" onchange="applyFilters()"
+            class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="text-[9px] text-slate-400">Setelah</label>
+          <input id="filter-deadline-after" type="date" onchange="applyFilters()"
+            class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+    </div>
+
+    <!-- HPS Custom Range -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">HPS Custom (Rp)</div>
+      <div class="space-y-2">
+        <input id="filter-hps-min" type="number" placeholder="Min (contoh: 500000000)" onchange="applyFilters()"
+          class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input id="filter-hps-max" type="number" placeholder="Max (contoh: 10000000000)" onchange="applyFilters()"
+          class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+
+    <!-- Crawl Controls -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Sinkronisasi Data</div>
+      <div class="space-y-2">
+        <input id="crawl-instansi" type="text" placeholder="Kode instansi (pisah koma) atau 'all'"
+          class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <button onclick="startCrawl()" id="btn-crawl"
+          class="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span id="crawl-btn-text">Sync Data Baru</span>
+          <span id="crawl-spinner" class="spinner hidden"></span>
+        </button>
+      </div>
+      <div id="crawl-status" class="mt-2 text-[10px] text-slate-400 hidden"></div>
+    </div>
+
+    <!-- Flush Records -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Pembersihan Data</div>
+      <button onclick="openFlushModal()"
+        class="w-full px-3 py-2 text-xs font-semibold rounded-lg border-2 border-red-300 text-red-600 bg-red-50 hover:bg-red-100 hover:border-red-400 active:bg-red-200 transition-colors flex items-center justify-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        Flush Data Non-Aktif
+      </button>
+      <div class="mt-1.5 text-[10px] text-slate-400 text-center" id="flush-status"></div>
+    </div>
+
+    <!-- Profil Perusahaan -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Profil Perusahaan</div>
+      <button onclick="openCompanyModal()"
+        class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-colors flex items-center justify-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        Kelola Profil & Kualifikasi
+      </button>
+      <div class="mt-2 text-[10px] text-slate-400" id="company-sidebar-info">Memuat...</div>
+    </div>
+
+    <!-- Monitoring Crawl -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Monitoring Crawl</div>
+        <button onclick="toggleMonitorPanel()" id="btn-monitor-toggle"
+          class="text-[10px] text-blue-600 hover:text-blue-800 font-medium">
+          <span id="monitor-toggle-text">Tampilkan</span>
+        </button>
+      </div>
+      <div id="monitor-panel" class="hidden">
+        <!-- Status badge -->
+        <div class="flex items-center gap-2 mb-3">
+          <span id="monitor-status-badge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+            Idle
+          </span>
+          <span id="monitor-elapsed" class="text-[10px] text-slate-400 font-mono"></span>
+        </div>
+        <!-- Progress bar -->
+        <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
+          <div id="monitor-progress-bar" class="progress-bar-fill bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+        </div>
+        <!-- Counter text -->
+        <div class="text-[11px] text-slate-600 mb-2" id="monitor-counter">Memproses 0 dari 0 paket (0%)</div>
+        <!-- Saved / Skipped / Errors -->
+        <div class="flex items-center gap-3 mb-2 text-[10px]">
+          <span class="text-emerald-600"><span id="monitor-saved">0</span> tersimpan</span>
+          <span class="text-amber-600"><span id="monitor-skipped">0</span> dilewati</span>
+          <span class="text-red-600"><span id="monitor-errors">0</span> error</span>
+        </div>
+        <!-- Instansi progress -->
+        <div class="text-[10px] text-slate-500 mb-2">
+          Instansi: <span id="monitor-instansi-progress">0</span>/<span id="monitor-instansi-total">0</span>
+          — <span id="monitor-current-instansi" class="font-mono text-slate-700">-</span>
+        </div>
+        <!-- ETA -->
+        <div class="text-[10px] text-slate-400 mb-2" id="monitor-eta"></div>
+        <!-- Activity log (last 3) -->
+        <div class="mt-2 border-t border-slate-100 pt-2">
+          <div class="text-[9px] uppercase text-slate-400 font-semibold mb-1">Aktivitas Terkini</div>
+          <div id="monitor-activity-log" class="space-y-1 max-h-16 overflow-y-auto scrollbar-thin">
+            <div class="text-[10px] text-slate-400 italic">Belum ada aktivitas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scheduler -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Auto Crawl</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">Interval 1 jam</div>
+        </div>
+        <button onclick="toggleScheduler()" id="btn-scheduler"
+          class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {% if scheduler_running %}bg-blue-600{% else %}bg-slate-300{% endif %}">
+          <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform {% if scheduler_running %}translate-x-4{% else %}translate-x-1{% endif %}"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Pipeline Summary -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Pipeline Pengajuan</div>
+      <div id="pipeline-summary" class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] text-slate-500">Belum Diproses</span>
+          <span class="text-[10px] font-semibold text-slate-700" id="pipe-belum">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] text-slate-500">Sudah Submit</span>
+          <span class="text-[10px] font-semibold text-emerald-700" id="pipe-submit">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] text-slate-500">Menang</span>
+          <span class="text-[10px] font-bold text-emerald-600" id="pipe-menang">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] text-slate-500">Gagal</span>
+          <span class="text-[10px] font-semibold text-red-600" id="pipe-gagal">-</span>
+        </div>
+      </div>
+      <div id="pipe-urgency" class="hidden mt-2 pt-2 border-t border-slate-100 text-[9px] text-center"></div>
+    </div>
+
+    <!-- Watchlist -->
+    <div class="sidebar-section px-5 py-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Watchlist</div>
+        <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="watchlist-count">0</span>
+      </div>
+      <div id="watchlist-list" class="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
+        <div class="text-[10px] text-slate-400 italic">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- Report Summary (Admin/Superadmin only) -->
+    <div class="sidebar-section px-5 py-4">
+      <a href="/reports/" class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors flex items-center justify-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Report Summary
+      </a>
+    </div>
+
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex-shrink-0">
+      <div class="flex items-center justify-between gap-4">
+        <!-- Mobile hamburger -->
+        <button onclick="toggleMobileSidebar()" class="mobile-only p-2 text-slate-500 hover:text-slate-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+
+        <!-- Status Tabs -->
+        <nav class="flex items-center gap-1 -mb-px">
+          <button onclick="setStatus('')" data-tab="all"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors tab-active">
+            Semua
+          </button>
+          <button onclick="setStatus('aktif')" data-tab="aktif"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+            Aktif
+            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold" id="tab-count-aktif">0</span>
+          </button>
+          <button onclick="setStatus('prakualifikasi')" data-tab="prakualifikasi"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+            Prakualifikasi
+            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold" id="tab-count-prakualifikasi">0</span>
+          </button>
+          <button onclick="setStatus('it_priority')" data-tab="it_priority"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+            Prioritas IT
+            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold" id="tab-count-it-priority">0</span>
+          </button>
+          <button onclick="setStatus('recommended')" data-tab="recommended"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+            Rekomendasi
+            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-sky-100 text-sky-700 text-[10px] font-semibold" id="tab-count-recommended">0</span>
+          </button>
+        </nav>
+
+        <!-- Search + Pagination Controls -->
+        <div class="flex items-center gap-3">
+          <!-- Search -->
+          <div class="relative">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input id="global-search" type="text" placeholder="Cari nama paket / kode / instansi..."
+              oninput="debouncedApplyFilters()"
+              class="w-72 pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <!-- Page Size -->
+          <select id="page-size" onchange="applyFilters()"
+            class="px-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="10">10 baris</option>
+            <option value="25" selected>25 baris</option>
+            <option value="50">50 baris</option>
+          </select>
+          <!-- Download -->
+          <a id="dl-csv" href="/api/download/csv/" onclick="return appendFilterDownload(this)"
+            class="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+            <svg class="w-3.5 h-3.5 inline-block -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            CSV
+          </a>
+          <a id="dl-excel" href="/api/download/excel/" onclick="return appendFilterDownload(this)"
+            class="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+            <svg class="w-3.5 h-3.5 inline-block -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Excel
+          </a>
+          <!-- User Profile -->
+          {% if user.is_authenticated %}
+          <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
+            <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center">
+              <span class="text-[10px] font-bold text-blue-700">{{ user.get_full_name.0|default:user.username.0|upper }}</span>
+            </div>
+            <div class="text-[10px] leading-tight">
+              <div class="font-semibold text-slate-700">{{ user.get_full_name|default:user.username }}</div>
+              <div class="text-slate-400">{{ user.get_role_display }}</div>
+            </div>
+            <form method="POST" action="{% url 'accounts:logout' %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" title="Logout" class="ml-1 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              </button>
+            </form>
+          </div>
+          {% else %}
+          <a href="{% url 'accounts:login' %}" class="px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+            Login
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    <!-- Results Info Bar -->
+    <div class="bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
+      <div class="text-xs text-slate-500">
+        Menampilkan <span class="font-semibold text-slate-700" id="showing-start">0</span>-<span class="font-semibold text-slate-700" id="showing-end">0</span> dari <span class="font-semibold text-slate-700" id="showing-total">0</span> tender
+      </div>
+      <div class="flex items-center gap-1">
+        <button onclick="goPage(-1)" id="btn-prev"
+          class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+          &laquo; Prev
+        </button>
+        <span class="text-xs text-slate-500 px-2 font-mono" id="page-indicator">1 / 1</span>
+        <button onclick="goPage(1)" id="btn-next"
+          class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+          Next &raquo;
+        </button>
+      </div>
+    </div>
+
+    <!-- TENDER RADAR -->
+    <div id="radar-section" class="bg-white border-b border-slate-100 flex-shrink-0">
+      <button type="button" onclick="toggleRadar()" class="w-full flex items-center justify-between px-6 py-2.5 hover:bg-slate-50 transition-colors">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-indigo-700 uppercase tracking-wider">Tender Radar</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold" id="radar-count">0</span>
+          <span class="text-[10px] text-slate-400" id="radar-subtitle">Peluang cocok untuk perusahaan Anda</span>
+        </div>
+        <svg id="radar-chevron" class="w-4 h-4 text-slate-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div id="radar-body" class="hidden px-6 pb-4 max-h-96 overflow-y-auto">
+        <div class="flex items-center gap-2 mb-3" id="radar-filters">
+          <button onclick="loadRadar('all')" data-rf="all" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors bg-indigo-50 text-indigo-700 border-indigo-200">Semua</button>
+          <button onclick="loadRadar('PRIORITAS_TINGGI')" data-rf="PRIORITAS_TINGGI" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50">Sangat Layak</button>
+          <button onclick="loadRadar('LAYAK_DIKEJAR')" data-rf="LAYAK_DIKEJAR" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50">Layak</button>
+          <button onclick="loadRadar('REVIEW')" data-rf="REVIEW" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50">Perlu Ditinjau</button>
+        </div>
+        <div id="radar-loading" class="text-[11px] text-slate-400 italic py-4">Memuat radar tender...</div>
+        <div id="radar-results" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- INTELLIGENCE READINESS STATUS -->
+    <div class="bg-white border-b border-slate-100 px-6 py-1.5 flex items-center gap-3 flex-shrink-0 flex-wrap">
+      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AI Analysis</span>
+      <span id="intel-readiness-chip" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-slate-50 text-slate-500 border-slate-200">Memuat...</span>
+      <span class="text-[10px] text-slate-500">AI Match <span class="font-semibold text-slate-800" id="intel-ai-pct">0%</span> · Skor Peluang <span class="font-semibold text-slate-800" id="intel-opp-pct">0%</span></span>
+      <span class="text-[10px]" id="intel-ready-text"></span>
+    </div>
+
+    <!-- Main Table -->
+    <div class="flex-1 overflow-auto bg-slate-50">
+      <div class="table-scroll">
+      <table class="w-full text-xs">
+        <thead class="bg-white sticky top-0 z-10 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-24">Kode Paket</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[260px]">Nama Paket & Jenis</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[180px]">K/L/PD Instansi</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[140px]">Tahapan</th>
+            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-16" title="Skor Prioritas IT">Skor IT</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-28">Tgl Dibuat</th>
+            <th class="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider w-24">HPS</th>
+            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-20" title="Tingkat Kecocokan Kualifikasi">Kecocokan</th>
+            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-20" title="Aksi">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="results-body" class="divide-y divide-slate-100 bg-white">
+          <tr><td colspan="9" class="px-4 py-16 text-center text-slate-400">
+            <div class="flex flex-col items-center gap-2">
+              <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <span>Memuat data tender...</span>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Flush Modal -->
+<div id="flush-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md mx-4 overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-slate-100 bg-red-50">
+      <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-800">Pembersihan Bank Data</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Pilih mode penghapusan yang diinginkan</p>
+        </div>
+      </div>
+    </div>
+    <!-- Body -->
+    <div class="px-6 py-5 space-y-3">
+      <!-- Option 1: Non-Prakualifikasi (Recommended) -->
+      <button onclick="flushRecords('non_prakualifikasi')"
+        class="w-full text-left px-4 py-3 rounded-lg border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 transition-colors group">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-emerald-800">Hapus Data Non-Prakualifikasi</div>
+            <div class="text-[10px] text-emerald-600 mt-0.5">Rekomendasi — hapus paket yang sudah tidak aktif</div>
+          </div>
+          <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-200 px-2 py-0.5 rounded-full">AMAN</span>
+        </div>
+      </button>
+      <!-- Option 2: Inactive -->
+      <button onclick="flushRecords('inactive')"
+        class="w-full text-left px-4 py-3 rounded-lg border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-colors group">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-amber-800">Hapus Semua Data Inaktif</div>
+            <div class="text-[10px] text-amber-600 mt-0.5">Hapus Selesai, Dikontrak, Batal, Gagal</div>
+          </div>
+          <span class="text-[10px] font-semibold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">MODERATE</span>
+        </div>
+      </button>
+      <!-- Option 3: All (Danger) -->
+      <button onclick="flushRecords('all')"
+        class="w-full text-left px-4 py-3 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 transition-colors group">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-red-800">Hapus SEMUA Data (Reset Total)</div>
+            <div class="text-[10px] text-red-600 mt-0.5">Reset seluruh bank data — memerlukan konfirmasi</div>
+          </div>
+          <span class="text-[10px] font-semibold text-red-700 bg-red-200 px-2 py-0.5 rounded-full">BAHAYA</span>
+        </div>
+      </button>
+    </div>
+    <!-- Footer -->
+    <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+      <button onclick="closeFlushModal()"
+        class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">
+        Batal
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- KBLI CRUD Modal -->
+<div id="kbli-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg mx-4 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 bg-indigo-50">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">Manajemen KBLI Master</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">Tambah, edit, atau hapus kode KBLI</p>
+          </div>
+        </div>
+        <button onclick="closeKbliModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <!-- Add new KBLI -->
+    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50">
+      <div class="flex gap-2">
+        <input id="kbli-new-code" type="text" placeholder="Kode (62019)" maxlength="10"
+          class="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+        <input id="kbli-new-name" type="text" placeholder="Nama KBLI" maxlength="300"
+          class="flex-[2] px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+        <button onclick="createKbli()" class="px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors whitespace-nowrap">Tambah</button>
+      </div>
+    </div>
+    <!-- List -->
+    <div id="kbli-list" class="max-h-72 overflow-y-auto px-6 py-3 space-y-1.5">
+      <div class="text-xs text-slate-400 text-center py-4">Memuat data...</div>
+    </div>
+    <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+      <button onclick="closeKbliModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COMPANY PROFILE MODAL ===== -->
+<div id="company-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-slate-100 bg-blue-50 flex-shrink-0">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">Profil Perusahaan & Kualifikasi</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5" id="company-modal-subtitle">Kelola data profil dan kualifikasi perusahaan</p>
+          </div>
+        </div>
+        <button onclick="closeCompanyModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="px-6 pt-3 border-b border-slate-100 flex gap-1 flex-shrink-0">
+      <button onclick="switchCompanyTab('profile')" id="ctab-profile" class="company-tab px-3 py-2 text-xs font-medium text-blue-700 border-b-2 border-blue-600">Profil</button>
+      <button onclick="switchCompanyTab('quals')" id="ctab-quals" class="company-tab px-3 py-2 text-xs font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700">Kualifikasi</button>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto px-6 py-4">
+      <!-- Profile Tab -->
+      <div id="company-tab-profile">
+        <div id="company-profile-form" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Nama Perusahaan *</label>
+              <input id="cp-name" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="PT Nama Perusahaan">
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">NIB *</label>
+              <input id="cp-nib" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="Nomor Induk Berusaha">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">NPWP</label>
+              <input id="cp-npwp" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="99.888.777.6-555.000">
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Telepon</label>
+              <input id="cp-phone" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="021-xxxxxxx">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Alamat</label>
+            <textarea id="cp-address" rows="2" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none resize-none" placeholder="Alamat lengkap"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Email Perusahaan</label>
+              <input id="cp-email" type="email" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="info@company.co.id">
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Contact Person</label>
+              <input id="cp-contact" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="Nama PIC">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Modal Disetor (Rp)</label>
+              <input id="cp-modal" type="number" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="0">
+            </div>
+            <div>
+              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Penghasilan Tahunan (Rp)</label>
+              <input id="cp-penghasilan" type="number" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="0">
+            </div>
+          </div>
+        </div>
+        <div id="company-profile-empty" class="hidden text-center py-8">
+          <div class="text-slate-400 text-xs mb-3">Belum ada profil perusahaan</div>
+          <button onclick="createCompanyProfile()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Buat Profil Perusahaan</button>
+        </div>
+      </div>
+
+      <!-- Qualifications Tab -->
+      <div id="company-tab-quals" class="hidden">
+        <!-- Add qualification form -->
+        <div id="qual-add-form" class="hidden mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div class="text-[10px] uppercase text-slate-400 font-semibold mb-2">Tambah Kualifikasi Baru</div>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label class="block text-[10px] text-slate-500 mb-0.5">Kategori *</label>
+              <select id="qf-category" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" onchange="onQualCategoryChange()">
+                <option value="izin_usaha">Izin Usaha / SBU / Sertifikasi</option>
+                <option value="pengalaman_kerja">Pengalaman Kerja</option>
+                <option value="sdm">SDM (Personil)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-500 mb-0.5">Status</label>
+              <select id="qf-status" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="active">Aktif</option>
+                <option value="expired">Kedaluwarsa</option>
+                <option value="needs_renewal">Perlu Diperbarui</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Common: Nama -->
+          <div class="mb-2">
+            <label class="block text-[10px] text-slate-500 mb-0.5">Nama / Judul *</label>
+            <input id="qf-name" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nama izin / proyek / personil">
+          </div>
+
+          <!-- === DYNAMIC FIELDS PER CATEGORY === -->
+
+          <!-- Izin Usaha / SBU / Sertifikasi -->
+          <div id="qf-fields-izin" class="dyn-fields">
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Nomor Izin/Sertifikat</label>
+                <input id="qf-number" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="No. izin">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Klasifikasi Usaha</label>
+                <select id="qf-klasifikasi" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="">—</option>
+                  <option value="kecil">Kecil</option>
+                  <option value="menengah">Menengah</option>
+                  <option value="besar">Besar</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Nilai (Rp)</label>
+                <input id="qf-value" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="0">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Berlaku Dari</label>
+                <input id="qf-from" type="date" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="block text-[10px] text-slate-500 mb-0.5">Berlaku Sampai</label>
+              <input id="qf-until" type="date" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
+            </div>
+          </div>
+
+          <!-- Pengalaman Kerja -->
+          <div id="qf-fields-pengalaman" class="dyn-fields hidden">
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Nama Paket Pekerjaan</label>
+                <input id="qf-project" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Pengembangan Sistem...">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Instansi / Klien</label>
+                <input id="qf-client" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Kementerian / BUMN">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Nilai Kontrak (Rp)</label>
+                <input id="qf-value" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="0">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Tahun Selesai</label>
+                <input id="qf-year" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="2024" min="2000" max="2030">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Lokasi</label>
+                <input id="qf-location" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Jakarta">
+              </div>
+            </div>
+          </div>
+
+          <!-- SDM (Personil) -->
+          <div id="qf-fields-sdm" class="dyn-fields hidden">
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Nama Personil</label>
+                <input id="qf-person-name" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nama lengkap">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Jabatan / Posisi</label>
+                <input id="qf-position" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Project Manager">
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mb-2">
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Pendidikan</label>
+                <select id="qf-education" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="">—</option>
+                  <option value="sma">SMA/SMK</option>
+                  <option value="d3">D3</option>
+                  <option value="s1">S1</option>
+                  <option value="s2">S2</option>
+                  <option value="s3">S3</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Pengalaman (Tahun)</label>
+                <input id="qf-exp-years" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="5" min="0" max="50">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-500 mb-0.5">Sertifikasi / SKK</label>
+                <input id="qf-skk" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="CCNA, PMP...">
+              </div>
+            </div>
+          </div>
+
+          <!-- KBLI Multi-Select Tag Input (common to all) -->
+          <div class="mb-3">
+            <label class="block text-[10px] text-slate-500 mb-0.5">Kode KBLI (opsional, bisa lebih dari satu)</label>
+            <div id="qf-kbli-container" class="flex flex-wrap gap-1 p-1.5 min-h-[32px] bg-white border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-200">
+              <div id="qf-kbli-tags" class="flex flex-wrap gap-1"></div>
+              <input id="qf-kbli-input" type="text" class="flex-1 min-w-[80px] px-1 py-0.5 text-xs outline-none" placeholder="Ketik kode, Enter" onkeydown="handleKbliInput(event)">
+            </div>
+            <div class="text-[9px] text-slate-400 mt-0.5">Tekan Enter untuk menambah. Contoh: 62019, 62090</div>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button onclick="hideQualForm()" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800">Batal</button>
+            <button onclick="saveQualification()" class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Simpan</button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-[10px] uppercase text-slate-400 font-semibold">Daftar Kualifikasi</div>
+          <button onclick="showQualForm()" id="btn-add-qual" class="hidden px-2.5 py-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">+ Tambah</button>
+        </div>
+
+        <div id="qual-list" class="space-y-2">
+          <div class="text-xs text-slate-400 text-center py-6">Memuat data...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
+      <div class="text-[10px] text-slate-400" id="company-modal-status"></div>
+      <div class="flex gap-2">
+        <button onclick="closeCompanyModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
+        <button onclick="saveCompanyProfile()" id="btn-save-company" class="hidden px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Simpan Profil</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TENDER DETAIL MODAL ===== -->
+<div id="tender-detail-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-4 px-2 md:py-8 md:px-4" onclick="closeTenderDetailModal(event)">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+    <!-- Header (Full Width) -->
+    <div class="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white flex-shrink-0">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <span id="tdm-badge-tahap" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"></span>
+            <span id="tdm-badge-it" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">IT</span>
+            <span id="tdm-badge-submission" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border"></span>
+          </div>
+          <h2 id="tdm-title" class="text-sm md:text-base font-bold text-slate-800 leading-snug"></h2>
+          <p id="tdm-subtitle" class="text-[11px] text-slate-400 mt-1"></p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div id="tdm-hps" class="text-sm md:text-base font-bold text-emerald-700"></div>
+          <div id="tdm-kode" class="text-[10px] text-slate-400 mt-0.5 font-mono"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Body (2-Column Grid) -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+      <div class="modal-detail-body grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- LEFT COLUMN -->
+        <div class="space-y-5">
+          <!-- Info Umum -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Informasi Umum</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div><span class="text-slate-400">Instansi:</span> <span id="tdm-instansi" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Satuan Kerja:</span> <span id="tdm-satker" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Jenis Pengadaan:</span> <span id="tdm-jenis" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Metode:</span> <span id="tdm-metode" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Lokasi:</span> <span id="tdm-lokasi" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Tahun Anggaran:</span> <span id="tdm-tahun" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">KBLI:</span> <span id="tdm-kbli" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-400">Peserta:</span> <span id="tdm-peserta" class="text-slate-700 font-medium"></span></div>
+            </div>
+          </div>
+          <!-- Jadwal Tahapan -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Jadwal Tahapan</h3>
+            <div id="tdm-jadwal" class="overflow-x-auto">
+              <table class="w-full text-[11px] border border-slate-200 rounded-lg overflow-hidden">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr><th class="px-3 py-1.5 text-left">#</th><th class="px-3 py-1.5 text-left">Tahap</th><th class="px-3 py-1.5 text-left">Mulai</th><th class="px-3 py-1.5 text-left">Sampai</th><th class="px-3 py-1.5 text-left">Perubahan</th></tr>
+                </thead>
+                <tbody id="tdm-jadwal-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- RIGHT COLUMN -->
+        <div class="space-y-5">
+          <!-- Syarat Kualifikasi -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Syarat Kualifikasi</h3>
+            <div id="tdm-syarat" class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-3 max-h-64 md:max-h-80 overflow-y-auto whitespace-pre-line leading-relaxed"></div>
+          </div>
+          <!-- AI / Tingkat Kecocokan -->
+          <div id="tdm-ai-section">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Kecocokan Kualitas <span class="text-[9px] font-normal text-slate-400">(AI Fit)</span></h3>
+            <div id="tdm-ai-content" class="bg-slate-50 rounded-lg p-3">
+              <div class="text-[11px] text-slate-400 italic">Klik tombol Analisis untuk melihat skor kecocokan</div>
+            </div>
+          </div>
+          <!-- Opportunity Score -->
+          <div id="tdm-opportunity-section">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Skor Peluang <span class="text-[9px] font-normal text-slate-400">(Prioritas Tender)</span></h3>
+            <div id="tdm-opportunity-content" class="bg-slate-50 rounded-lg p-3">
+              <div class="text-[11px] text-slate-400 italic">Memuat...</div>
+            </div>
+          </div>
+          <!-- Competitive Intelligence -->
+          <div>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Competitive Intelligence</h3>
+            <div id="tdm-competition-content" class="bg-slate-50 rounded-lg p-3">
+              <div class="text-[11px] text-slate-400 italic">Memuat...</div>
+            </div>
+          </div>
+          <!-- Submitter Workflow -->
+          <div id="tdm-submitter-section">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Status Pengajuan</h3>
+            <div id="tdm-submitter-actions" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div class="px-4 py-3 md:px-6 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <a id="tdm-link-lpse" href="#" target="_blank" rel="noreferrer" class="text-[11px] text-blue-600 hover:underline font-medium">Buka di LPSE &rarr;</a>
+        <button onclick="toggleWatchlist()" id="tdm-btn-watchlist" class="px-3 py-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          <span id="watchlist-btn-text">Watchlist</span>
+        </button>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="runAiMatchFromModal()" id="tdm-btn-ai" class="px-3 py-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors">Analisis Kecocokan</button>
+        <button onclick="closeTenderDetailModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== STATE ===== */
+const state = {
+  currentPage: 1,
+  totalPages: 1,
+  totalResults: 0,
+  currentStatus: '',
+  filters: {},
+};
+
+const csrftoken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ===== DEBOUNCE ===== */
+let _debounceTimer;
+function debouncedApplyFilters() {
+  clearTimeout(_debounceTimer);
+  _debounceTimer = setTimeout(() => applyFilters(), 300);
+}
+
+/* ===== STATUS TABS ===== */
+function setStatus(status) {
+  state.currentStatus = status;
+  state.currentPage = 1;
+
+  document.querySelectorAll('.status-tab').forEach(tab => {
+    tab.classList.remove('tab-active');
+    if (tab.dataset.tab === status || (status === '' && tab.dataset.tab === 'all')) {
+      tab.classList.add('tab-active');
+    }
+  });
+
+  if (status === 'recommended') {
+    fetchRecommended();
+  } else {
+    applyFilters();
+  }
+}
+function buildParams() {
+  const p = new URLSearchParams();
+  p.set('page', state.currentPage);
+  p.set('page_size', document.getElementById('page-size').value);
+
+  // Tab is mutually exclusive — send as single "tab" param
+  if (state.currentStatus && state.currentStatus !== 'all') {
+    p.set('tab', state.currentStatus);
+  }
+
+  const hps = document.querySelector('input[name="hps_range"]:checked');
+  if (hps && hps.value) p.set('hps_range', hps.value);
+
+  const jenis = document.querySelector('input[name="jenis"]:checked');
+  if (jenis && jenis.value) p.set('jenis', jenis.value);
+
+  document.querySelectorAll('input[name="kbli_code"]:checked').forEach(cb => {
+    p.append('kbli_code', cb.value);
+  });
+
+  document.querySelectorAll('input[name="tahapan"]:checked').forEach(cb => {
+    p.append('tahapan', cb.value);
+  });
+
+  const search = document.getElementById('global-search').value.trim();
+  if (search) p.set('search', search);
+
+  const location = document.getElementById('filter-location').value.trim();
+  if (location) p.set('location', location);
+
+  const deadlineBefore = document.getElementById('filter-deadline-before').value;
+  if (deadlineBefore) p.set('deadline_before', deadlineBefore);
+
+  const deadlineAfter = document.getElementById('filter-deadline-after').value;
+  if (deadlineAfter) p.set('deadline_after', deadlineAfter);
+
+  const hpsMin = document.getElementById('filter-hps-min').value;
+  if (hpsMin) p.set('hps_min', hpsMin);
+
+  const hpsMax = document.getElementById('filter-hps-max').value;
+  if (hpsMax) p.set('hps_max', hpsMax);
+
+  return p;
+}
+
+/* ===== APPLY FILTERS ===== */
+async function applyFilters() {
+  state.currentPage = 1;
+  await fetchResults();
+  fetchFilterCounts();
+}
+
+async function fetchResults() {
+  const params = buildParams();
+  try {
+    const resp = await fetch(`/api/results/?${params}`);
+    const data = await resp.json();
+
+    state.totalResults = data.total;
+    state.totalPages = data.total_pages;
+    state.currentPage = data.page;
+
+    renderResults(data.results);
+    renderPagination(data);
+  } catch (e) {
+    console.error('Failed to fetch results:', e);
+  }
+}
+
+async function fetchFilterCounts() {
+  const params = buildParams();
+  params.delete('page');
+  params.delete('page_size');
+  params.delete('tab');  // Badge counts must be independent of active tab
+  try {
+    const resp = await fetch(`/api/filter-counts/?${params}`);
+    const data = await resp.json();
+
+    document.getElementById('total-count-sidebar').textContent = data.total.toLocaleString('id-ID');
+
+    document.getElementById('hps-count-all').textContent = data.total.toLocaleString('id-ID');
+    document.getElementById('hps-count-gt10m').textContent = (data.hps.gt10m || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-5m_10m').textContent = (data.hps['5m_10m'] || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-2m_5m').textContent = (data.hps['2m_5m'] || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-1m_2m').textContent = (data.hps['1m_2m'] || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-500j_1m').textContent = (data.hps['500j_1m'] || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-200j_500j').textContent = (data.hps['200j_500j'] || 0).toLocaleString('id-ID');
+    document.getElementById('hps-count-lt200j').textContent = (data.hps.lt200j || 0).toLocaleString('id-ID');
+
+    const j = data.jenis;
+    document.getElementById('jenis-count-all').textContent = data.total.toLocaleString('id-ID');
+    document.getElementById('jenis-count-konstruksi').textContent = (j['Pekerjaan Konstruksi'] || 0).toLocaleString('id-ID');
+    document.getElementById('jenis-count-konsultansi').textContent = (j['Jasa Konsultansi'] || 0).toLocaleString('id-ID');
+    document.getElementById('jenis-count-barang').textContent = (j['Pengadaan Barang'] || 0).toLocaleString('id-ID');
+    document.getElementById('jenis-count-lainnya').textContent = (j['Jasa Lainnya'] || 0).toLocaleString('id-ID');
+
+    document.getElementById('tab-count-aktif').textContent = (data.status.aktif || 0).toLocaleString('id-ID');
+    document.getElementById('tab-count-prakualifikasi').textContent = (data.status.prakualifikasi || 0).toLocaleString('id-ID');
+
+    const tahapCounts = data.tahapan || {};
+    document.getElementById('tahapan-count-prakualifikasi').textContent = (tahapCounts['Pra-Kualifikasi'] || 0).toLocaleString('id-ID');
+    document.getElementById('tahapan-count-pengumuman').textContent = (tahapCounts['Pengumuman'] || 0).toLocaleString('id-ID');
+    document.getElementById('tahapan-count-evaluasi').textContent = (tahapCounts['Evaluasi'] || 0).toLocaleString('id-ID');
+    document.getElementById('tahapan-count-penawaran').textContent = (tahapCounts['Penawaran'] || 0).toLocaleString('id-ID');
+    document.getElementById('tahapan-count-lainnya').textContent = (tahapCounts['Lainnya'] || 0).toLocaleString('id-ID');
+
+    const kbli = data.kbli || {};
+    Object.keys(kbli).forEach(code => {
+      const el = document.getElementById('kbli-count-' + code);
+      if (el) el.textContent = (kbli[code].count || 0).toLocaleString('id-ID');
+    });
+
+    document.getElementById('tab-count-it-priority').textContent = (data.it_priority_count || 0).toLocaleString('id-ID');
+  } catch (e) {
+    console.error('Failed to fetch filter counts:', e);
+  }
+}
+
+/* ===== RENDER TABLE ===== */
+function renderPersistedAiScore(r) {
+  const score = r.ai_score || 0;
+  if (score <= 0) return '<span class="text-slate-300 text-[10px]">&mdash;</span>';
+  let label = 'bg-red-50 text-red-700 border-red-200';
+  if (score >= 71) label = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  else if (score >= 41) label = 'bg-amber-50 text-amber-700 border-amber-200';
+  return `<button onclick="openTenderDetail(${r.id})" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${label} hover:opacity-80 transition-opacity cursor-pointer">${score}%</button>`;
+}
+
+function renderResults(results) {
+  const tbody = document.getElementById('results-body');
+
+  if (!results || results.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-16 text-center text-slate-400">
+      <div class="flex flex-col items-center gap-2">
+        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span>Tidak ada data ditemukan</span>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = results.map(r => {
+    const tahapBadge = getTahapBadge(r.tahap_saat_ini, r.is_prakualifikasi);
+    const url = esc(r.url_pengumuman);
+    const dateStr = r.tanggal_dibuat || r.scraped_at || '-';
+    const itBadge = r.is_it_priority
+      ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1" title="Skor Prioritas IT: ${r.priority_score}">🔥 Prioritas IT</span>`
+      : '';
+    const scoreCell = r.is_it_priority
+      ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700">${r.priority_score}</span>`
+      : `<span class="text-slate-300">-</span>`;
+
+    return `<tr class="hover:bg-blue-50/40 transition-colors fade-in">
+      <td class="px-4 py-3">
+        <button onclick="openTenderDetail(${r.id})"
+           class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left"
+           title="Lihat detail tender">${esc(r.id_lelang)}</button>
+      </td>
+      <td class="px-4 py-3">
+        <button onclick="openTenderDetail(${r.id})" class="text-left w-full cursor-pointer">
+          <div class="text-xs font-semibold text-slate-800 leading-snug">${esc(r.nama_paket)}${itBadge}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${esc(r.jenis_pengadaan)}</div>
+        </button>
+      </td>
+      <td class="px-4 py-3 text-xs text-slate-600">${esc(r.instansi)}</td>
+      <td class="px-4 py-3">${tahapBadge}</td>
+      <td class="px-4 py-3 text-center">${scoreCell}</td>
+      <td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">${esc(dateStr)}</td>
+      <td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700 whitespace-nowrap">${esc(r.hps_short)}</td>
+      <td class="px-4 py-3 text-center" id="ai-score-${r.id}">
+        ${renderPersistedAiScore(r)}
+      </td>
+      <td class="px-4 py-3 text-center" id="action-${r.id}">
+        <span class="text-slate-300 text-[10px]">&mdash;</span>
+      </td>
+      <td class="px-4 py-3 text-center">
+        <button onclick="runAiMatch(${r.id}, '${esc(r.id_lelang)}')" title="Analisis Kecocokan Kualifikasi" class="p-1 text-slate-400 hover:text-blue-600 transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===== TAHAP BADGE ===== */
+function getTahapBadge(tahap, isPrakualifikasi) {
+  if (isPrakualifikasi) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">${esc(tahap)}</span>`;
+  }
+  const t = (tahap || '').toLowerCase();
+
+  if (t.includes('penandatanganan') || t.includes('kontrak')) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">${esc(tahap)}</span>`;
+  }
+  if (t.includes('selesai') || t.includes('tender selesai')) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">${esc(tahap)}</span>`;
+  }
+  if (t.includes('evaluasi') || t.includes('penawaran') || t.includes('kualifikasi') || t.includes('clarification') || t.includes('jawaban')) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">${esc(tahap)}</span>`;
+  }
+  if (t.includes('pengumuman') || t.includes('pasca')) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">${esc(tahap)}</span>`;
+  }
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-500 border border-slate-200">${esc(tahap || 'N/A')}</span>`;
+}
+
+/* ===== PAGINATION ===== */
+function renderPagination(data) {
+  const start = (data.page - 1) * data.page_size + 1;
+  const end = Math.min(data.page * data.page_size, data.total);
+  document.getElementById('showing-start').textContent = data.total > 0 ? start : 0;
+  document.getElementById('showing-end').textContent = end;
+  document.getElementById('showing-total').textContent = data.total.toLocaleString('id-ID');
+  document.getElementById('page-indicator').textContent = `${data.page} / ${data.total_pages}`;
+
+  document.getElementById('btn-prev').disabled = data.page <= 1;
+  document.getElementById('btn-next').disabled = data.page >= data.total_pages;
+}
+
+function goPage(delta) {
+  const newPage = state.currentPage + delta;
+  if (newPage < 1 || newPage > state.totalPages) return;
+  state.currentPage = newPage;
+  fetchResults();
+}
+
+/* ===== CRAWL CONTROL ===== */
+async function startCrawl() {
+  const instansi = document.getElementById('crawl-instansi').value || 'all';
+  const btn = document.getElementById('btn-crawl');
+  const spinner = document.getElementById('crawl-spinner');
+  const btnText = document.getElementById('crawl-btn-text');
+  const statusEl = document.getElementById('crawl-status');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  btnText.textContent = 'Syncing...';
+  statusEl.classList.remove('hidden');
+  statusEl.className = 'mt-2 text-[10px] text-blue-600';
+  statusEl.textContent = 'Memulai crawl...';
+
+  try {
+    const form = new URLSearchParams();
+    form.append('instansi', instansi);
+    form.append('workers', '3');
+
+    const resp = await fetch('/api/start-crawl/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      statusEl.className = 'mt-2 text-[10px] text-red-600';
+      statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+      btnText.textContent = 'Sync Data Baru';
+      return;
+    }
+
+    statusEl.className = 'mt-2 text-[10px] text-blue-600';
+    statusEl.textContent = `Crawl berjalan — ${data.instansi_count || '?'} instansi, ${data.workers} workers`;
+    pollCrawlStatus();
+  } catch (e) {
+    statusEl.className = 'mt-2 text-[10px] text-red-600';
+    statusEl.textContent = 'Gagal menghubungi server: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    btnText.textContent = 'Sync Data Baru';
+  }
+}
+
+function pollCrawlStatus() {
+  const statusEl = document.getElementById('crawl-status');
+  const monitorPanel = document.getElementById('monitor-panel');
+  const isMonitorOpen = !monitorPanel.classList.contains('hidden');
+
+  const poll = setInterval(async () => {
+    try {
+      const resp = await fetch('/api/crawl-progress/');
+      const p = await resp.json();
+
+      // Update monitoring panel (always, even if hidden)
+      updateMonitorPanel(p);
+
+      // Check if we also need the old status endpoint
+      const statusResp = await fetch('/api/status/');
+      const statusData = await statusResp.json();
+
+      if (!statusData.crawl_in_progress) {
+        clearInterval(poll);
+        const jobs = statusData.recent_jobs || [];
+        const latest = jobs[0];
+
+        if (latest && latest.status === 'completed') {
+          statusEl.className = 'mt-2 text-[10px] text-emerald-600';
+          statusEl.textContent = `Crawl selesai — ${latest.total_details} paket tersimpan`;
+          updateMonitorStatus('Completed', 100);
+        } else if (latest && latest.status === 'failed') {
+          statusEl.className = 'mt-2 text-[10px] text-red-600';
+          statusEl.textContent = 'Crawl gagal — cek log terminal untuk detail';
+          updateMonitorStatus('Failed', -1);
+        } else {
+          statusEl.className = 'mt-2 text-[10px] text-slate-500';
+          statusEl.textContent = 'Crawl selesai';
+          updateMonitorStatus('Completed', 100);
+        }
+
+        setTimeout(() => { statusEl.classList.add('hidden'); }, 5000);
+        applyFilters();
+        return;
+      }
+
+      // Still running
+      const jobs = statusData.recent_jobs || [];
+      const running = jobs.find(j => j.status === 'running');
+      if (running) {
+        statusEl.className = 'mt-2 text-[10px] text-blue-600';
+        statusEl.textContent = `Crawl berjalan... (Job #${running.id})`;
+      }
+    } catch (e) {
+      clearInterval(poll);
+      statusEl.className = 'mt-2 text-[10px] text-red-600';
+      statusEl.textContent = 'Gagal memeriksa status';
+      updateMonitorStatus('Failed', -1);
+    }
+  }, 2000);
+}
+
+/* ===== MONITOR PANEL ===== */
+let _monitorActivityLog = [];
+
+function toggleMonitorPanel() {
+  const panel = document.getElementById('monitor-panel');
+  const text = document.getElementById('monitor-toggle-text');
+  if (panel.classList.contains('hidden')) {
+    panel.classList.remove('hidden');
+    text.textContent = 'Sembunyikan';
+    // Fetch current state immediately
+    fetchMonitorProgress();
+  } else {
+    panel.classList.add('hidden');
+    text.textContent = 'Tampilkan';
+  }
+}
+
+async function fetchMonitorProgress() {
+  try {
+    const resp = await fetch('/api/crawl-progress/');
+    const p = await resp.json();
+    updateMonitorPanel(p);
+  } catch (e) {}
+}
+
+function updateMonitorPanel(p) {
+  // Status badge
+  const badge = document.getElementById('monitor-status-badge');
+  const colors = {
+    'Idle': 'bg-slate-100 text-slate-500',
+    'Running': 'bg-blue-100 text-blue-700 progress-pulse',
+    'Completed': 'bg-emerald-100 text-emerald-700',
+    'Failed': 'bg-red-100 text-red-700',
+  };
+  badge.className = `inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${colors[p.status] || colors['Idle']}`;
+  badge.textContent = p.status === 'Running' ? '🟢 Running' : p.status === 'Completed' ? '✅ Selesai' : p.status === 'Failed' ? '❌ Gagal' : 'Idle';
+
+  // Progress bar
+  const bar = document.getElementById('monitor-progress-bar');
+  const pct = p.percentage || 0;
+  bar.style.width = `${pct}%`;
+  if (p.status === 'Failed') {
+    bar.className = 'progress-bar-fill bg-red-500 h-2.5 rounded-full';
+  } else if (p.status === 'Completed') {
+    bar.className = 'progress-bar-fill bg-emerald-500 h-2.5 rounded-full';
+  } else {
+    bar.className = 'progress-bar-fill bg-blue-600 h-2.5 rounded-full';
+  }
+
+  // Counter
+  document.getElementById('monitor-counter').textContent =
+    `Memproses ${p.processed_packages || 0} dari ${p.total_packages || 0} paket (${Math.round(pct)}%)`;
+
+  // Saved / Skipped / Errors
+  document.getElementById('monitor-saved').textContent = p.saved_packages || 0;
+  document.getElementById('monitor-skipped').textContent = p.skipped_packages || 0;
+  document.getElementById('monitor-errors').textContent = p.error_packages || 0;
+
+  // Instansi
+  document.getElementById('monitor-instansi-progress').textContent = p.completed_instansi || 0;
+  document.getElementById('monitor-instansi-total').textContent = p.total_instansi || 0;
+  document.getElementById('monitor-current-instansi').textContent = p.current_instansi || '-';
+
+  // Elapsed
+  const elapsed = p.elapsed_seconds || 0;
+  document.getElementById('monitor-elapsed').textContent = elapsed > 0 ? formatDuration(elapsed) : '';
+
+  // ETA
+  const etaEl = document.getElementById('monitor-eta');
+  if (p.status === 'Running' && p.estimated_remaining > 0) {
+    etaEl.textContent = `Estimasi selesai: ~${formatDuration(p.estimated_remaining)}`;
+  } else if (p.status === 'Completed') {
+    etaEl.textContent = `Selesai dalam ${formatDuration(elapsed)}`;
+  } else {
+    etaEl.textContent = '';
+  }
+
+  // Activity log (keep last 3)
+  if (p.current_activity && p.status === 'Running') {
+    const entry = p.current_activity;
+    if (_monitorActivityLog[0] !== entry) {
+      _monitorActivityLog.unshift(entry);
+      if (_monitorActivityLog.length > 3) _monitorActivityLog.pop();
+      const logEl = document.getElementById('monitor-activity-log');
+      logEl.innerHTML = _monitorActivityLog.map(a =>
+        `<div class="text-[10px] text-slate-600 font-mono truncate">${esc(a)}</div>`
+      ).join('');
+    }
+  }
+
+  if (p.status === 'Completed' || p.status === 'Failed') {
+    _monitorActivityLog = [];
+  }
+}
+
+function updateMonitorStatus(status, pct) {
+  const badge = document.getElementById('monitor-status-badge');
+  const colors = {
+    'Completed': 'bg-emerald-100 text-emerald-700',
+    'Failed': 'bg-red-100 text-red-700',
+  };
+  badge.className = `inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${colors[status] || ''}`;
+  badge.textContent = status === 'Completed' ? '✅ Selesai' : '❌ Gagal';
+
+  if (pct >= 0) {
+    const bar = document.getElementById('monitor-progress-bar');
+    bar.style.width = `${pct}%`;
+    bar.className = `progress-bar-fill ${status === 'Completed' ? 'bg-emerald-500' : 'bg-red-500'} h-2.5 rounded-full`;
+  }
+}
+
+function formatDuration(seconds) {
+  seconds = Math.round(seconds);
+  if (seconds < 60) return `${seconds}d`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  return `${h}j ${m % 60}m`;
+}
+
+/* ===== SCHEDULER ===== */
+async function toggleScheduler() {
+  try {
+    await fetch('/api/status/toggle/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken },
+    });
+    location.reload();
+  } catch (e) {
+    console.error('Failed to toggle scheduler:', e);
+  }
+}
+
+/* ===== DOWNLOAD FILTER ===== */
+function appendFilterDownload(a) {
+  const params = buildParams();
+  params.delete('page');
+  params.delete('page_size');
+  const sep = a.href.includes('?') ? '&' : '?';
+  a.href = a.href.split('?')[0] + sep + params.toString();
+  return true;
+}
+
+/* ===== FLUSH RECORDS ===== */
+function openFlushModal() {
+  document.getElementById('flush-modal').classList.remove('hidden');
+}
+
+function closeFlushModal() {
+  document.getElementById('flush-modal').classList.add('hidden');
+}
+
+async function flushRecords(mode) {
+  const statusEl = document.getElementById('flush-status');
+  const labels = {
+    'non_prakualifikasi': 'Non-Prakualifikasi',
+    'inactive': 'Semua Inaktif',
+    'all': 'SEMUA DATA (Reset)',
+  };
+
+  // Extra confirmation for destructive modes
+  if (mode === 'all') {
+    const confirm = window.prompt('Ketik "RESET" untuk konfirmasi hapus SEMUA data:');
+    if (confirm !== 'RESET') {
+      statusEl.textContent = 'Dibatalkan.';
+      statusEl.className = 'mt-1.5 text-[10px] text-slate-400 text-center';
+      closeFlushModal();
+      return;
+    }
+  }
+
+  statusEl.textContent = `Menghapus data ${labels[mode]}...`;
+  statusEl.className = 'mt-1.5 text-[10px] text-amber-600 text-center font-medium';
+
+  try {
+    const formData = new FormData();
+    formData.append('mode', mode);
+    formData.append('csrfmiddlewaretoken', csrftoken);
+
+    const resp = await fetch('/api/flush-records/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken },
+      body: formData,
+    });
+
+    const data = await resp.json();
+
+    if (data.status === 'success') {
+      statusEl.textContent = `Berhasil menghapus ${data.deleted_count.toLocaleString('id-ID')} data. Sisa: ${data.remaining_count.toLocaleString('id-ID')}`;
+      statusEl.className = 'mt-1.5 text-[10px] text-emerald-600 text-center font-medium';
+      // Refresh table and counters
+      fetchResults();
+      fetchFilterCounts();
+    } else {
+      statusEl.textContent = `Gagal: ${data.message || 'Unknown error'}`;
+      statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+    }
+  } catch (e) {
+    statusEl.textContent = `Error: ${e.message}`;
+    statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+  }
+
+  closeFlushModal();
+}
+
+/* ===== KBLI CRUD ===== */
+function openKbliModal() {
+  document.getElementById('kbli-modal').classList.remove('hidden');
+  loadKbliList();
+}
+
+function closeKbliModal() {
+  document.getElementById('kbli-modal').classList.add('hidden');
+}
+
+async function loadKbliList() {
+  const container = document.getElementById('kbli-list');
+  try {
+    const resp = await fetch('/api/kbli/');
+    const data = await resp.json();
+    if (!data.items || data.items.length === 0) {
+      container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Belum ada data KBLI</div>';
+      return;
+    }
+    container.innerHTML = data.items.map(k => `
+      <div class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-slate-50 border border-slate-100 group" id="kbli-row-${k.code}">
+        <input type="checkbox" ${k.is_active ? 'checked' : ''} onchange="toggleKbliActive('${k.code}', this.checked)" class="w-3.5 h-3.5 rounded">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-mono font-bold text-slate-700">${k.code}</div>
+          <div class="text-[10px] text-slate-500 truncate" title="${k.name}">${k.name}</div>
+        </div>
+        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onclick="editKbli('${k.code}')" title="Edit" class="p-1 rounded hover:bg-slate-200 transition-colors">
+            <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onclick="deleteKbli('${k.code}')" title="Hapus" class="p-1 rounded hover:bg-red-100 transition-colors">
+            <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="text-xs text-red-500 text-center py-4">Gagal memuat: ${e.message}</div>`;
+  }
+}
+
+async function createKbli() {
+  const code = document.getElementById('kbli-new-code').value.trim();
+  const name = document.getElementById('kbli-new-name').value.trim();
+  if (!code || !name) return;
+
+  try {
+    const resp = await fetch('/api/kbli/create/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, name, is_active: true }),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      document.getElementById('kbli-new-code').value = '';
+      document.getElementById('kbli-new-name').value = '';
+      loadKbliList();
+      refreshKbliSidebar();
+    } else {
+      alert(data.message || 'Gagal menambah KBLI');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function editKbli(code) {
+  const newName = window.prompt(`Edit nama KBLI ${code}:`, '');
+  if (newName === null || !newName.trim()) return;
+  try {
+    const resp = await fetch(`/api/kbli/${code}/update/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      loadKbliList();
+      refreshKbliSidebar();
+    } else {
+      alert(data.message || 'Gagal update');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function toggleKbliActive(code, isActive) {
+  try {
+    await fetch(`/api/kbli/${code}/update/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    refreshKbliSidebar();
+  } catch (e) {
+    console.error('Failed to toggle KBLI:', e);
+  }
+}
+
+async function deleteKbli(code) {
+  if (!window.confirm(`Hapus KBLI ${code} dari master?`)) return;
+  try {
+    const resp = await fetch(`/api/kbli/${code}/delete/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken },
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      // Uncheck if it was selected
+      const cb = document.querySelector(`input[name="kbli_code"][value="${code}"]`);
+      if (cb) cb.checked = false;
+      loadKbliList();
+      refreshKbliSidebar();
+    } else {
+      alert(data.message || 'Gagal hapus');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function refreshKbliSidebar() {
+  try {
+    const resp = await fetch('/api/kbli/');
+    const data = await resp.json();
+    const container = document.getElementById('kbli-filters');
+    const checkedValues = [];
+    container.querySelectorAll('input[name="kbli_code"]:checked').forEach(cb => checkedValues.push(cb.value));
+
+    container.innerHTML = (data.items || []).filter(k => k.is_active).map(k => `
+      <label class="flex items-center gap-2 cursor-pointer group">
+        <input type="checkbox" name="kbli_code" value="${k.code}" class="kbli-cb w-3.5 h-3.5 rounded"
+          ${checkedValues.includes(k.code) ? 'checked' : ''} onchange="applyFilters()">
+        <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1 truncate" title="${k.code} — ${k.name}">${k.code} — ${k.name.substring(0, 30)}</span>
+        <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="kbli-count-${k.code}">0</span>
+      </label>
+    `).join('');
+    fetchFilterCounts();
+  } catch (e) {
+    console.error('Failed to refresh KBLI sidebar:', e);
+  }
+}
+
+/* ===== SUBMISSION STATUS ===== */
+const SUBMISSION_STATUSES = {
+  'belum_diproses': { label: 'Belum Diproses', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+  'cocok_diproses': { label: 'Cocok & Diproses', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  'sudah_submit': { label: 'Sudah Submit', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  'menang': { label: 'Menang', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  'gagal': { label: 'Gagal', cls: 'bg-red-50 text-red-700 border-red-200' },
+  'tidak_cocok': { label: 'Tidak Cocok', cls: 'bg-red-50 text-red-700 border-red-200' },
+};
+
+async function loadSubmissionStatuses() {
+  try {
+    const resp = await fetch('/api/submission/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    (data.items || []).forEach(s => {
+      const cell = document.getElementById('action-' + s.tender_id);
+      if (!cell) return;
+      const info = SUBMISSION_STATUSES[s.status] || SUBMISSION_STATUSES['belum_diproses'];
+      cell.innerHTML = '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ' + info.cls + '">' + esc(info.label) + '</span>';
+    });
+  } catch (e) { /* silent */ }
+}
+
+/* ===== COMPANY PROFILE ===== */
+let _companyId = null;
+let _qualifications = [];
+
+function openCompanyModal() {
+  document.getElementById('company-modal').classList.remove('hidden');
+  loadCompanyData();
+}
+
+function closeCompanyModal() {
+  document.getElementById('company-modal').classList.add('hidden');
+}
+
+function switchCompanyTab(tab) {
+  document.querySelectorAll('.company-tab').forEach(b => {
+    b.classList.remove('text-blue-700', 'border-blue-600');
+    b.classList.add('text-slate-500', 'border-transparent');
+  });
+  const active = document.getElementById('ctab-' + tab);
+  active.classList.remove('text-slate-500', 'border-transparent');
+  active.classList.add('text-blue-700', 'border-blue-600');
+
+  document.getElementById('company-tab-profile').classList.toggle('hidden', tab !== 'profile');
+  document.getElementById('company-tab-quals').classList.toggle('hidden', tab !== 'quals');
+}
+
+async function loadCompanyData() {
+  try {
+    const resp = await fetch('/api/company/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await resp.json();
+    const items = data.items || [];
+
+    // Find company for current user (superadmin picks first, others use their own)
+    const meResp = await fetch('/api/auth/me/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const me = await meResp.json();
+
+    let company = null;
+    if (me.company_id) {
+      company = items.find(c => c.id === me.company_id);
+    } else if (items.length > 0) {
+      company = items[0]; // superadmin: pick first
+    }
+
+    if (company) {
+      _companyId = company.id;
+      document.getElementById('cp-name').value = company.name || '';
+      document.getElementById('cp-nib').value = company.nib || '';
+      document.getElementById('cp-npwp').value = company.npwp || '';
+      document.getElementById('cp-phone').value = company.phone || '';
+      document.getElementById('cp-address').value = company.address || '';
+      document.getElementById('cp-email').value = company.email || '';
+      document.getElementById('cp-contact').value = company.contact_person || '';
+      document.getElementById('cp-modal').value = company.modal_disetor || '';
+      document.getElementById('cp-penghasilan').value = company.penghasilan_tahunan || '';
+
+      document.getElementById('company-profile-form').classList.remove('hidden');
+      document.getElementById('company-profile-empty').classList.add('hidden');
+      document.getElementById('btn-save-company').classList.remove('hidden');
+      document.getElementById('btn-add-qual').classList.remove('hidden');
+      document.getElementById('company-modal-subtitle').textContent = company.name;
+
+      // Load qualifications
+      loadQualifications(company.id);
+    } else {
+      document.getElementById('company-profile-form').classList.add('hidden');
+      document.getElementById('company-profile-empty').classList.remove('hidden');
+      document.getElementById('btn-save-company').classList.add('hidden');
+      document.getElementById('btn-add-qual').classList.add('hidden');
+      document.getElementById('qual-list').innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Buat profil perusahaan terlebih dahulu</div>';
+    }
+
+    // Update sidebar info
+    const sideInfo = document.getElementById('company-sidebar-info');
+    if (company) {
+      sideInfo.innerHTML = `<span class="font-medium text-slate-600">${esc(company.name)}</span><br><span class="text-slate-400">NIB: ${esc(company.nib)}</span>`;
+    } else {
+      sideInfo.textContent = 'Belum ada profil';
+    }
+  } catch (e) {
+    console.error('Failed to load company data:', e);
+  }
+}
+
+async function createCompanyProfile() {
+  const name = document.getElementById('cp-name').value.trim();
+  const nib = document.getElementById('cp-nib').value.trim();
+  if (!name || !nib) { alert('Nama dan NIB wajib diisi'); return; }
+
+  try {
+    const resp = await fetch('/api/company/create/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ name, nib }),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      _companyId = data.id;
+      document.getElementById('company-profile-form').classList.remove('hidden');
+      document.getElementById('company-profile-empty').classList.add('hidden');
+      document.getElementById('btn-save-company').classList.remove('hidden');
+      document.getElementById('btn-add-qual').classList.remove('hidden');
+      document.getElementById('company-modal-status').textContent = 'Profil berhasil dibuat';
+      loadCompanyData();
+    } else {
+      alert(data.message || 'Gagal membuat profil');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function saveCompanyProfile() {
+  if (!_companyId) { createCompanyProfile(); return; }
+
+  const body = {
+    name: document.getElementById('cp-name').value.trim(),
+    nib: document.getElementById('cp-nib').value.trim(),
+    npwp: document.getElementById('cp-npwp').value.trim(),
+    phone: document.getElementById('cp-phone').value.trim(),
+    address: document.getElementById('cp-address').value.trim(),
+    email: document.getElementById('cp-email').value.trim(),
+    contact_person: document.getElementById('cp-contact').value.trim(),
+    modal_disetor: parseInt(document.getElementById('cp-modal').value) || 0,
+    penghasilan_tahunan: parseInt(document.getElementById('cp-penghasilan').value) || 0,
+  };
+
+  try {
+    const resp = await fetch(`/api/company/${_companyId}/update/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      document.getElementById('company-modal-status').textContent = 'Tersimpan ✓';
+      setTimeout(() => { document.getElementById('company-modal-status').textContent = ''; }, 2000);
+      loadCompanyData();
+    } else {
+      alert(data.message || 'Gagal menyimpan');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function loadQualifications(companyId) {
+  try {
+    const resp = await fetch(`/api/company/${companyId}/qualifications/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await resp.json();
+    _qualifications = data.items || [];
+
+    const list = document.getElementById('qual-list');
+    if (_qualifications.length === 0) {
+      list.innerHTML = '<div class="text-xs text-slate-400 text-center py-6">Belum ada data kualifikasi</div>';
+      return;
+    }
+
+    const catColors = {
+      izin_usaha: 'bg-blue-50 text-blue-700 border-blue-200',
+      sbu: 'bg-violet-50 text-violet-700 border-violet-200',
+      pengalaman_kerja: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      sertifikasi: 'bg-amber-50 text-amber-700 border-amber-200',
+      sdm: 'bg-pink-50 text-pink-700 border-pink-200',
+    };
+    const statusColors = {
+      active: 'bg-emerald-100 text-emerald-700',
+      expired: 'bg-red-100 text-red-700',
+      needs_renewal: 'bg-amber-100 text-amber-700',
+    };
+
+    list.innerHTML = _qualifications.map(q => {
+      const kbliList = (q.kbli_codes && q.kbli_codes.length > 0) ? q.kbli_codes : (q.kbli_code ? [q.kbli_code] : []);
+      const kbliHtml = kbliList.length > 0
+        ? kbliList.map(k => `<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-mono bg-indigo-50 text-indigo-600 border border-indigo-200">${esc(k)}</span>`).join(' ')
+        : '';
+      const d = q.details || {};
+      let detailHtml = '';
+      if (q.category === 'pengalaman_kerja' && d.location) detailHtml = `<span class="text-[9px] text-slate-400"> &middot; ${esc(d.location)}</span>`;
+      if (q.category === 'sdm' && d.position) detailHtml = `<span class="text-[9px] text-slate-400"> &middot; ${esc(d.position)}${d.education ? ' &middot; ' + esc(d.education) : ''}</span>`;
+
+      return `
+      <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold border ${catColors[q.category] || 'bg-slate-50 text-slate-600 border-slate-200'}">${esc(q.category_display)}</span>
+              <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold ${statusColors[q.status] || ''}">${esc(q.status)}</span>
+            </div>
+            <div class="text-xs font-medium text-slate-800 truncate">${esc(q.name)}${detailHtml}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1">
+              ${q.number ? '<span>No: ' + esc(q.number) + '</span>' : ''}
+              ${q.value_amount ? '<span>Rp ' + Number(q.value_amount).toLocaleString('id-ID') + '</span>' : ''}
+              ${q.project_name ? '<span>Proyek: ' + esc(q.project_name) + '</span>' : ''}
+              ${q.client_name ? '<span>Klien: ' + esc(q.client_name) + '</span>' : ''}
+            </div>
+            ${kbliHtml ? '<div class="flex flex-wrap gap-1 mt-1">' + kbliHtml + '</div>' : ''}
+          </div>
+          <button onclick="deleteQualification(${q.id})" class="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0" title="Hapus">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error('Failed to load qualifications:', e);
+  }
+}
+
+function showQualForm() {
+  document.getElementById('qual-add-form').classList.remove('hidden');
+  document.getElementById('qf-name').focus();
+  onQualCategoryChange();
+}
+
+function hideQualForm() {
+  document.getElementById('qual-add-form').classList.add('hidden');
+  document.getElementById('qf-name').value = '';
+  if (document.getElementById('qf-number')) document.getElementById('qf-number').value = '';
+  if (document.getElementById('qf-value')) document.getElementById('qf-value').value = '';
+  if (document.getElementById('qf-project')) document.getElementById('qf-project').value = '';
+  if (document.getElementById('qf-client')) document.getElementById('qf-client').value = '';
+  if (document.getElementById('qf-year')) document.getElementById('qf-year').value = '';
+  if (document.getElementById('qf-location')) document.getElementById('qf-location').value = '';
+  if (document.getElementById('qf-person-name')) document.getElementById('qf-person-name').value = '';
+  if (document.getElementById('qf-position')) document.getElementById('qf-position').value = '';
+  if (document.getElementById('qf-exp-years')) document.getElementById('qf-exp-years').value = '';
+  if (document.getElementById('qf-skk')) document.getElementById('qf-skk').value = '';
+  _qfKbliCodes = [];
+  renderKbliTags();
+}
+
+/* ===== DYNAMIC QUALIFICATION FORM ===== */
+let _qfKbliCodes = [];
+
+function onQualCategoryChange() {
+  const cat = document.getElementById('qf-category').value;
+  document.querySelectorAll('.dyn-fields').forEach(el => el.classList.add('hidden'));
+  if (cat === 'izin_usaha') {
+    document.getElementById('qf-fields-izin').classList.remove('hidden');
+  } else if (cat === 'pengalaman_kerja') {
+    document.getElementById('qf-fields-pengalaman').classList.remove('hidden');
+  } else if (cat === 'sdm') {
+    document.getElementById('qf-fields-sdm').classList.remove('hidden');
+  }
+}
+
+function handleKbliInput(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const input = document.getElementById('qf-kbli-input');
+    const val = input.value.trim();
+    if (val && !_qfKbliCodes.includes(val)) {
+      _qfKbliCodes.push(val);
+      renderKbliTags();
+    }
+    input.value = '';
+  }
+}
+
+function removeKbliTag(code) {
+  _qfKbliCodes = _qfKbliCodes.filter(c => c !== code);
+  renderKbliTags();
+}
+
+function renderKbliTags() {
+  const container = document.getElementById('qf-kbli-tags');
+  container.innerHTML = _qfKbliCodes.map(c =>
+    `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-mono rounded border border-indigo-200">${esc(c)}<button onclick="removeKbliTag('${esc(c)}')" class="text-indigo-400 hover:text-indigo-700">&times;</button></span>`
+  ).join('');
+}
+
+async function saveQualification() {
+  if (!_companyId) { alert('Simpan profil perusahaan terlebih dahulu'); return; }
+
+  const category = document.getElementById('qf-category').value;
+  const body = {
+    category: category,
+    name: document.getElementById('qf-name').value.trim(),
+    status: document.getElementById('qf-status').value,
+    kbli_codes: _qfKbliCodes,
+    kbli_code: _qfKbliCodes.length > 0 ? _qfKbliCodes[0] : '',
+    details: {},
+  };
+
+  if (!body.name) { alert('Nama kualifikasi wajib diisi'); return; }
+
+  if (category === 'izin_usaha') {
+    body.number = document.getElementById('qf-number').value.trim();
+    body.klasifikasi_usaha = document.getElementById('qf-klasifikasi').value;
+    body.value_amount = parseInt(document.getElementById('qf-value').value) || 0;
+    body.valid_from = document.getElementById('qf-from').value || null;
+    body.valid_until = document.getElementById('qf-until').value || null;
+  } else if (category === 'pengalaman_kerja') {
+    body.project_name = document.getElementById('qf-project').value.trim();
+    body.client_name = document.getElementById('qf-client').value.trim();
+    body.value_amount = parseInt(document.getElementById('qf-value').value) || 0;
+    body.project_year = parseInt(document.getElementById('qf-year').value) || 0;
+    body.details = { location: document.getElementById('qf-location').value.trim() };
+  } else if (category === 'sdm') {
+    body.details = {
+      person_name: document.getElementById('qf-person-name').value.trim(),
+      position: document.getElementById('qf-position').value.trim(),
+      education: document.getElementById('qf-education').value,
+      experience_years: parseInt(document.getElementById('qf-exp-years').value) || 0,
+      skk: document.getElementById('qf-skk').value.trim(),
+    };
+  }
+
+  try {
+    const resp = await fetch(`/api/company/${_companyId}/qualifications/create/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      hideQualForm();
+      loadQualifications(_companyId);
+    } else {
+      alert(data.message || 'Gagal menyimpan');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteQualification(qualId) {
+  if (!confirm('Hapus kualifikasi ini?')) return;
+  try {
+    const resp = await fetch(`/api/company/${_companyId}/qualifications/${qualId}/delete/`, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      loadQualifications(_companyId);
+    } else {
+      alert(data.message || 'Gagal menghapus');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+/* ===== AI MATCH ===== */
+async function runAiMatch(tenderId, tenderCode) {
+  if (!tenderId) { alert('ID tender tidak tersedia'); return; }
+  const cell = document.getElementById('ai-score-' + tenderId);
+  if (cell) cell.innerHTML = '<span class="text-[10px] text-blue-500">Analyzing...</span>';
+
+  try {
+    const resp = await fetch('/api/match/run/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ tender_id: tenderId, force: true }),
+    });
+    const data = await resp.json();
+    if (resp.status === 401) {
+      if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="Silakan login terlebih dahulu">Login required</span>';
+      return;
+    }
+    if (resp.status === 503) {
+      if (cell) cell.innerHTML = '<span class="text-[10px] text-amber-400" title="AI provider tidak tersedia">AI off</span>';
+      return;
+    }
+    if (data.error) {
+      const shortErr = data.error.length > 40 ? data.error.substring(0, 40) + '...' : data.error;
+      if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="' + esc(data.error) + '">Error: ' + esc(shortErr) + '</span>';
+      return;
+    }
+    const r = data.result || {};
+    renderAiScore(tenderId, tenderCode, r);
+    if (r.fit_score !== undefined) showAiModal(r, tenderCode);
+  } catch (e) {
+    if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="' + esc(e.message) + '">Network Error</span>';
+  }
+}
+
+function renderAiScore(tenderId, tenderCode, r) {
+  const cell = document.getElementById('ai-score-' + tenderId);
+  if (!cell) return;
+  const score = r.fit_score || 0;
+  let color = 'red', label = 'bg-red-50 text-red-700 border-red-200';
+  if (score >= 71) { color = 'green'; label = 'bg-emerald-50 text-emerald-700 border-emerald-200'; }
+  else if (score >= 41) { color = 'yellow'; label = 'bg-amber-50 text-amber-700 border-amber-200'; }
+  cell.innerHTML = '<button onclick="openTenderDetail(' + tenderId + ')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + label + ' hover:opacity-80 transition-opacity cursor-pointer">' + score + '%</button>';
+}
+
+function showAiModal(r, tenderCode) {
+  const criteria = (r.criteria || []);
+  let criteriaHtml = criteria.map(c => {
+    const icon = c.status === 'pass' ? '<span class="text-emerald-500">&#10003;</span>'
+      : c.status === 'fail' ? '<span class="text-red-500">&#10007;</span>'
+      : '<span class="text-amber-500">&#9888;</span>';
+    return `<div class="p-3 bg-slate-50 rounded-lg">
+      <div class="flex items-start gap-2">
+        <span class="mt-0.5">${icon}</span>
+        <div class="flex-1">
+          <div class="text-xs font-medium text-slate-800">${esc(c.requirement)}</div>
+          ${c.evidence ? `<div class="text-[10px] text-slate-500 mt-1">Bukti: ${esc(c.evidence)}</div>` : ''}
+          ${c.action ? `<div class="text-[10px] text-blue-600 mt-1">Aksi: ${esc(c.action)}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const score = r.fit_score || 0;
+  let badgeColor = 'bg-red-100 text-red-700';
+  if (score >= 71) badgeColor = 'bg-emerald-100 text-emerald-700';
+  else if (score >= 41) badgeColor = 'bg-amber-100 text-amber-700';
+
+  const html = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="closeAiModal(event)">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">Tingkat Kecocokan</h3>
+            <p class="text-[10px] text-slate-400 mt-0.5">${esc(tenderCode)} &middot; ${esc(r.llm_provider || 'N/A')}</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-bold ${badgeColor}">${score}%</span>
+        </div>
+        <div class="px-6 py-3 border-b border-slate-100 bg-slate-50">
+          <div class="text-xs text-slate-600">${esc(r.summary || 'No summary available')}</div>
+        </div>
+        <div class="px-6 py-4 overflow-y-auto max-h-[50vh] space-y-2">
+          ${criteriaHtml || '<div class="text-xs text-slate-400 text-center py-4">Tidak ada kriteria ditemukan</div>'}
+        </div>
+        <div class="px-6 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button onclick="closeAiModal()" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeAiModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  const overlay = document.querySelector('[onclick*="closeAiModal"]');
+  if (overlay) overlay.remove();
+}
+
+/* ===== TENDER DETAIL MODAL ===== */
+let _tdmCurrentId = null;
+
+async function openTenderDetail(djangoId) {
+  if (!djangoId) return;
+  _tdmCurrentId = djangoId;
+  const modal = document.getElementById('tender-detail-modal');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+
+  // Reset fields
+  ['tdm-title','tdm-subtitle','tdm-instansi','tdm-satker','tdm-jenis','tdm-metode','tdm-lokasi','tdm-tahun','tdm-kbli','tdm-peserta','tdm-hps','tdm-kode'].forEach(id => {
+    document.getElementById(id).textContent = '...';
+  });
+  document.getElementById('tdm-jadwal-body').innerHTML = '';
+  document.getElementById('tdm-syarat').textContent = 'Memuat...';
+  document.getElementById('tdm-ai-section').classList.add('hidden');
+
+  try {
+    const resp = await fetch(`/api/tenders/${djangoId}/detail/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) throw new Error('Not found');
+    const d = await resp.json();
+    renderTenderDetail(d);
+    loadOpportunityScore(djangoId);
+    loadCompetitionIntelligence(djangoId);
+    checkWatchlistStatus();
+  } catch (e) {
+    document.getElementById('tdm-title').textContent = 'Gagal memuat detail';
+  }
+}
+
+function renderTenderDetail(d) {
+  document.getElementById('tdm-title').textContent = d.nama_paket || '-';
+  document.getElementById('tdm-subtitle').textContent = `${d.kode_instansi} / ${d.id_lelang}`;
+  document.getElementById('tdm-hps').textContent = d.hps_short || '-';
+  document.getElementById('tdm-kode').textContent = `Kode: ${d.id_lelang}`;
+  document.getElementById('tdm-instansi').textContent = d.instansi || '-';
+  document.getElementById('tdm-satker').textContent = d.satuan_kerja_detail || '-';
+  document.getElementById('tdm-jenis').textContent = d.jenis_pengadaan || '-';
+  document.getElementById('tdm-metode').textContent = d.metode_pengadaan || '-';
+  document.getElementById('tdm-lokasi').textContent = d.lokasi_pekerjaan || '-';
+  document.getElementById('tdm-tahun').textContent = d.tahun_anggaran || '-';
+  document.getElementById('tdm-peserta').textContent = d.peserta_count ? `${d.peserta_count} peserta` : '-';
+  document.getElementById('tdm-kbli').textContent = d.kbli_code ? `${d.kbli_code} — ${d.kbli_description}` : '-';
+
+  // Tahap badge
+  const tahapEl = document.getElementById('tdm-badge-tahap');
+  tahapEl.textContent = d.tahap_saat_ini || '-';
+  if (d.is_prakualifikasi) { tahapEl.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200'; }
+
+  // IT badge
+  const itBadge = document.getElementById('tdm-badge-it');
+  if (d.is_it_priority) { itBadge.classList.remove('hidden'); } else { itBadge.classList.add('hidden'); }
+
+  // Jadwal table
+  const jBody = document.getElementById('tdm-jadwal-body');
+  if (d.jadwal_json && d.jadwal_json.length) {
+    jBody.innerHTML = d.jadwal_json.map(j => `
+      <tr class="hover:bg-slate-50">
+        <td class="px-3 py-1.5 text-slate-400">${esc(j.no)}</td>
+        <td class="px-3 py-1.5 font-medium text-slate-700">${esc(j.tahap)}</td>
+        <td class="px-3 py-1.5 text-slate-600">${esc(j.mulai)}</td>
+        <td class="px-3 py-1.5 text-slate-600">${esc(j.sampai)}</td>
+        <td class="px-3 py-1.5 text-slate-400">${esc(j.perubahan)}</td>
+      </tr>`).join('');
+  } else {
+    document.getElementById('tdm-jadwal').innerHTML = '<p class="text-[11px] text-slate-400 italic">Jadwal tidak tersedia</p>';
+  }
+
+  // Syarat kualifikasi
+  const syaratEl = document.getElementById('tdm-syarat');
+  if (d.syarat_kualifikasi) {
+    syaratEl.textContent = d.syarat_kualifikasi;
+  } else {
+    syaratEl.textContent = 'Syarat kualifikasi tidak tersedia';
+  }
+
+  // LPSE link
+  document.getElementById('tdm-link-lpse').href = d.url_pengumuman || '#';
+
+  // AI button — always visible
+  document.getElementById('tdm-btn-ai').classList.remove('hidden');
+
+  // Show persistent AI score if available
+  const aiSection = document.getElementById('tdm-ai-section');
+  const aiContent = document.getElementById('tdm-ai-content');
+  aiSection.classList.remove('hidden');
+  if (d.ai_score > 0 && d.ai_analysis_json && d.ai_analysis_json.summary) {
+    renderTdmAiScore(d.ai_analysis_json);
+  } else {
+    aiContent.innerHTML = '<div class="text-[11px] text-slate-400 italic">Belum ada analisis. Klik "Analisis Kecocokan" untuk menjalankan.</div>';
+  }
+
+  // Load submission status and render submitter workflow
+  loadTdmSubmissionStatus(d.id);
+}
+
+function closeTenderDetailModal(e) {
+  if (e && e.target !== e.currentTarget && !e.target.closest('[onclick*="closeTenderDetailModal"]')) return;
+  document.getElementById('tender-detail-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  _tdmCurrentId = null;
+}
+
+async function loadCompetitionIntelligence(djangoId) {
+  const content = document.getElementById('tdm-competition-content');
+  if (!content) return;
+  content.innerHTML = '<div class="text-[11px] text-slate-400 italic">Memuat...</div>';
+
+  try {
+    const [winnerResp, compResp] = await Promise.all([
+      fetch(`/api/intelligence/tender/${djangoId}/winner/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }),
+      fetch(`/api/intelligence/tender/${djangoId}/competition/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    ]);
+    const winner = await winnerResp.json();
+    const comp = await compResp.json();
+
+    let winnerLine;
+    if (winner.status === 'not_found') {
+      winnerLine = '<div class="text-[11px] text-slate-400">Winner data <span class="font-semibold text-slate-600">Not available</span></div>';
+    } else if (winner.status === 'not_available' || winner.winner === null) {
+      winnerLine = '<div class="text-[11px] text-slate-400">Winner data <span class="font-semibold text-slate-600">Not available</span></div>';
+    } else {
+      winnerLine = `<div class="text-[11px] text-slate-600">Winner: <span class="font-semibold text-slate-800">${esc(winner.winner.name || '—')}</span></div>`;
+    }
+
+    let valueLine = '';
+    if (winner.status === 'ok' && winner.winner && winner.winner.contract_value) {
+      valueLine = `<div class="text-[11px] text-slate-600">Winning Value: <span class="font-semibold text-emerald-700">${esc(winner.winner.contract_value)}</span></div>`;
+    }
+
+    let participantLine;
+    if (comp.status === 'ok' && comp.participant_count > 0) {
+      let namesHtml = '';
+      if (Array.isArray(comp.participants) && comp.participants.length) {
+        namesHtml = '<ul class="mt-1 space-y-0.5">' + comp.participants.map(p =>
+          `<li class="text-[11px] text-slate-600">• ${esc(p && p.name ? p.name : '—')}${(p && p.npwp) ? ` <span class="text-slate-400">(${esc(p.npwp)})</span>` : ''}</li>`
+        ).join('') + '</ul>';
+      }
+      participantLine = `<div class="text-[11px] text-slate-600">Participants: <span class="font-semibold text-slate-800">${comp.participant_count}</span></div>${namesHtml}`;
+    } else {
+      participantLine = '<div class="text-[11px] text-slate-400">Participant data <span class="font-semibold text-slate-600">Not available</span></div>';
+    }
+
+    const note = (comp.data_note) ? `<div class="text-[9px] text-slate-400 italic mt-1">${esc(comp.data_note)}</div>` : '';
+    const limNote = (winner.data_limitation || comp.data_limitation)
+      ? `<div class="text-[9px] text-amber-600 italic mt-1">${esc(winner.data_limitation || comp.data_limitation)}</div>`
+      : '';
+
+    content.innerHTML = '<div class="space-y-1">' + winnerLine + valueLine + participantLine + note + limNote + '</div>';
+  } catch (e) {
+    content.innerHTML = '<div class="text-[11px] text-slate-400 italic">Gagal memuat data intelligence.</div>';
+  }
+}
+
+async function runAiMatchFromModal() {
+  if (!_tdmCurrentId) return;
+  const content = document.getElementById('tdm-ai-content');
+  content.innerHTML = '<span class="text-[11px] text-blue-500">Analyzing...</span>';
+  document.getElementById('tdm-ai-section').classList.remove('hidden');
+  try {
+    const resp = await fetch('/api/match/run/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ tender_id: _tdmCurrentId, force: true }),
+    });
+    const data = await resp.json();
+    if (resp.status === 401) {
+      content.innerHTML = '<span class="text-[11px] text-red-500">Silakan login terlebih dahulu untuk menjalankan analisis.</span>';
+      return;
+    }
+    if (resp.status === 503) {
+      content.innerHTML = '<span class="text-[11px] text-amber-500">AI provider tidak tersedia saat ini. Coba lagi nanti.</span>';
+      return;
+    }
+    if (data.error) {
+      content.innerHTML = '<span class="text-[11px] text-red-500">' + esc(data.error) + '</span>';
+      return;
+    }
+    const r = data.result || {};
+    renderTdmAiScore(r);
+  } catch (e) {
+    content.innerHTML = '<span class="text-[11px] text-red-500">Gagal menghubungi server: ' + esc(e.message) + '</span>';
+  }
+}
+
+function renderTdmAiScore(r) {
+  const score = r.fit_score || 0;
+  let badge = 'bg-red-50 text-red-700 border-red-200';
+  if (score >= 71) badge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  else if (score >= 41) badge = 'bg-amber-50 text-amber-700 border-amber-200';
+
+  let fallbackHtml = '';
+  if (r.is_fallback) {
+    const reason = r.fallback_reason ? `: ${esc(r.fallback_reason)}` : '';
+    fallbackHtml = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300" title="Fallback Mode: Aturan Lokal">⚠️ Rule-Based Fallback' + reason + '</span>';
+  }
+
+  const criteria = (r.criteria || []).map(c => {
+    const icon = c.status === 'pass' ? '<span class="text-emerald-500">&#10003;</span>' : c.status === 'fail' ? '<span class="text-red-500">&#10007;</span>' : '<span class="text-amber-500">&#9888;</span>';
+    return '<div class="flex items-start gap-2 py-1"><span class="mt-0.5">' + icon + '</span><div><div class="text-[11px] text-slate-700">' + esc(c.requirement) + '</div>' + (c.evidence ? '<div class="text-[10px] text-slate-400 mt-0.5">Bukti: ' + esc(c.evidence) + '</div>' : '') + '</div></div>';
+  }).join('');
+
+  document.getElementById('tdm-ai-content').innerHTML =
+    '<div class="flex flex-wrap items-center gap-2 mb-2">' +
+      '<span class="px-3 py-1 rounded-full text-sm font-bold border ' + badge + '">' + score + '%</span>' +
+      fallbackHtml +
+      '<span class="text-[10px] text-slate-400">' + esc(r.llm_provider || 'N/A') + ' &middot; ' + esc(r.summary || '') + '</span>' +
+    '</div>' +
+    '<div class="space-y-1">' + (criteria || '<span class="text-[11px] text-slate-400">Tidak ada kriteria</span>') + '</div>';
+}
+
+/* ===== SUBMISSION WORKFLOW (TENDER DETAIL MODAL) ===== */
+const SUBM_BADGE = {
+  'belum_diproses': 'bg-slate-100 text-slate-600 border-slate-200',
+  'cocok_diproses': 'bg-blue-50 text-blue-700 border-blue-200',
+  'sudah_submit': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'menang': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'gagal': 'bg-red-50 text-red-700 border-red-200',
+  'tidak_cocok': 'bg-red-50 text-red-700 border-red-200',
+};
+const SUBM_LABEL = {
+  'belum_diproses': 'Belum Diproses',
+  'cocok_diproses': 'Cocok & Diproses',
+  'sudah_submit': 'Sudah Submit',
+  'menang': 'Menang Tender',
+  'gagal': 'Gagal Menang',
+  'tidak_cocok': 'Tidak Cocok',
+};
+
+async function loadTdmSubmissionStatus(djangoId) {
+  const section = document.getElementById('tdm-submitter-section');
+  const actions = document.getElementById('tdm-submitter-actions');
+  const badge = document.getElementById('tdm-badge-submission');
+
+  try {
+    const resp = await fetch('/api/submission/?tender_id=' + djangoId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const items = data.items || [];
+    const sub = items.find(s => s.tender_id === djangoId);
+
+    if (sub) {
+      badge.classList.remove('hidden');
+      badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ' + (SUBM_BADGE[sub.status] || SUBM_BADGE['belum_diproses']);
+      badge.textContent = SUBM_LABEL[sub.status] || sub.status;
+
+      actions.innerHTML = renderSubmissionActions(djangoId, sub);
+    } else {
+      badge.classList.add('hidden');
+      actions.innerHTML = renderSubmissionActions(djangoId, null);
+    }
+  } catch (e) {
+    badge.classList.add('hidden');
+    actions.innerHTML = '<div class="text-[11px] text-slate-400">Gagal memuat status</div>';
+  }
+}
+
+function renderSubmissionActions(djangoId, sub) {
+  const currentStatus = sub ? sub.status : 'belum_diproses';
+  let html = '';
+
+  if (currentStatus === 'sudah_submit') {
+    html += '<div class="text-[11px] text-emerald-600 font-medium mb-2">Tender sudah di-submit. Update status hasil:</div>';
+    html += '<div class="flex gap-2">';
+    html += '<button onclick="updateSubmission(' + djangoId + ', \'menang\')" class="px-3 py-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-colors">Berhasil Menang</button>';
+    html += '<button onclick="updateSubmission(' + djangoId + ', \'gagal\')" class="px-3 py-1.5 text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">Gagal Menang</button>';
+    html += '</div>';
+  } else if (currentStatus === 'menang' || currentStatus === 'gagal') {
+    const color = currentStatus === 'menang' ? 'emerald' : 'red';
+    const label = currentStatus === 'menang' ? 'Berhasil Menang Tender' : 'Gagal Menang Tender';
+    html += '<div class="text-[11px] text-' + color + '-600 font-medium">' + label + '</div>';
+  } else {
+    html += '<button onclick="updateSubmission(' + djangoId + ', \'sudah_submit\')" class="w-full px-3 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-2">';
+    html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+    html += 'Sudah Submit di LPSE</button>';
+  }
+  return html;
+}
+
+async function updateSubmission(djangoId, newStatus) {
+  try {
+    const resp = await fetch('/api/submission/update/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ tender_id: djangoId, status: newStatus }),
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      loadTdmSubmissionStatus(djangoId);
+      loadSubmissionStatuses();
+    } else {
+      alert(data.error || 'Gagal update status');
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+/* ===== WATCHLIST ===== */
+async function loadWatchlist() {
+  try {
+    const resp = await fetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const items = data.items || [];
+    const container = document.getElementById('watchlist-list');
+    const countEl = document.getElementById('watchlist-count');
+
+    countEl.textContent = items.length;
+    if (items.length === 0) {
+      container.innerHTML = '<div class="text-[10px] text-slate-400 italic">Belum ada tender di-watchlist</div>';
+      return;
+    }
+    container.innerHTML = items.map(w => {
+      const scoreHtml = w.ai_score > 0
+        ? '<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">' + w.ai_score + '%</span>'
+        : '';
+      const itBadge = w.is_it_priority
+        ? '<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-violet-100 text-violet-700">IT</span>'
+        : '';
+      let urgBadge = '';
+      if (w.urgency === 'urgent') {
+        urgBadge = '<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-700">' + w.days_left + 'h</span>';
+      } else if (w.urgency === 'warning') {
+        urgBadge = '<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700">' + w.days_left + 'h</span>';
+      } else if (w.urgency === 'overdue') {
+        urgBadge = '<span class="inline-flex px-1 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-700">Lewat</span>';
+      } else if (w.deadline) {
+        urgBadge = '<span class="text-[8px] text-slate-400">' + w.deadline + '</span>';
+      }
+      const priorityHtml = w.priority_score > 0
+        ? '<span class="text-[8px] text-slate-400">P:' + w.priority_score + '</span>'
+        : '';
+      return '<div class="py-1.5 px-2 rounded hover:bg-slate-50 border border-slate-100">' +
+        '<div class="flex items-start justify-between">' +
+          '<button onclick="openTenderDetail(' + w.tender_id + ')" class="text-left flex-1 min-w-0">' +
+            '<div class="text-[10px] font-medium text-slate-700 truncate hover:text-blue-600">' + esc(w.nama_paket) + itBadge + '</div>' +
+            '<div class="flex items-center gap-1 mt-0.5 flex-wrap">' +
+              '<span class="text-[9px] text-slate-400">' + esc(w.hps_short) + '</span>' +
+              scoreHtml + priorityHtml + urgBadge +
+            '</div>' +
+          '</button>' +
+          '<button onclick="removeWatchlistItem(' + w.id + ')" class="text-[9px] text-red-400 hover:text-red-600 ml-1 flex-shrink-0" title="Hapus">&times;</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    console.error('Failed to load watchlist:', e);
+  }
+}
+
+let _tdmWatchlistId = null;
+
+async function toggleWatchlist() {
+  if (!_tdmCurrentId) return;
+  const btn = document.getElementById('tdm-btn-watchlist');
+  const textEl = document.getElementById('watchlist-btn-text');
+
+  if (_tdmWatchlistId) {
+    // Remove from watchlist
+    try {
+      const resp = await fetch('/api/watchlist/remove/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ watchlist_id: _tdmWatchlistId }),
+      });
+      if (resp.ok) {
+        _tdmWatchlistId = null;
+        textEl.textContent = 'Watchlist';
+        btn.classList.remove('bg-amber-100', 'border-amber-400');
+        btn.classList.add('bg-amber-50');
+        loadWatchlist();
+      }
+    } catch (e) { console.error(e); }
+  } else {
+    // Add to watchlist
+    try {
+      const resp = await fetch('/api/watchlist/add/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ tender_id: _tdmCurrentId }),
+      });
+      const data = await resp.json();
+      if (data.status === 'success') {
+        _tdmWatchlistId = data.id;
+        textEl.textContent = 'Tersimpan';
+        btn.classList.remove('bg-amber-50');
+        btn.classList.add('bg-amber-100', 'border-amber-400');
+        loadWatchlist();
+      }
+    } catch (e) { console.error(e); }
+  }
+}
+
+async function removeWatchlistItem(watchlistId) {
+  try {
+    await fetch('/api/watchlist/remove/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ watchlist_id: watchlistId }),
+    });
+    loadWatchlist();
+  } catch (e) { console.error(e); }
+}
+
+async function checkWatchlistStatus() {
+  if (!_tdmCurrentId) return;
+  _tdmWatchlistId = null;
+  try {
+    const resp = await fetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const match = (data.items || []).find(w => w.tender_id === _tdmCurrentId);
+    if (match) {
+      _tdmWatchlistId = match.id;
+      document.getElementById('watchlist-btn-text').textContent = 'Tersimpan';
+      const btn = document.getElementById('tdm-btn-watchlist');
+      btn.classList.remove('bg-amber-50');
+      btn.classList.add('bg-amber-100', 'border-amber-400');
+    } else {
+      document.getElementById('watchlist-btn-text').textContent = 'Watchlist';
+      const btn = document.getElementById('tdm-btn-watchlist');
+      btn.classList.remove('bg-amber-100', 'border-amber-400');
+      btn.classList.add('bg-amber-50');
+    }
+  } catch (e) { /* silent */ }
+}
+
+/* ===== OPPORTUNITY SCORE ===== */
+async function loadOpportunityScore(tenderId) {
+  const container = document.getElementById('tdm-opportunity-content');
+  container.innerHTML = '<div class="text-[11px] text-slate-400 italic">Menghitung...</div>';
+  try {
+    const resp = await fetch('/api/opportunity/' + tenderId + '/');
+    if (!resp.ok) {
+      container.innerHTML = '<div class="text-[11px] text-slate-400 italic">Skor tidak tersedia</div>';
+      return;
+    }
+    const data = await resp.json();
+    if (data.status === 'not_ready') {
+      container.innerHTML =
+        '<div class="text-center py-3">' +
+          '<div class="text-[11px] font-semibold text-amber-700 mb-1">NOT READY</div>' +
+          '<div class="text-[10px] text-slate-500 italic">' + esc(data.explanation && data.explanation[0] ? data.explanation[0] : 'Analisis AI belum tersedia. Jalankan AI Match terlebih dahulu.') + '</div>' +
+        '</div>';
+      return;
+    }
+    renderOpportunityScore(data);
+  } catch (e) {
+    container.innerHTML = '<div class="text-[11px] text-red-400">Gagal memuat</div>';
+  }
+}
+
+function renderOpportunityScore(data) {
+  const container = document.getElementById('tdm-opportunity-content');
+  const score = data.score || data.opportunity_score || 0;
+  let color = 'text-red-700 bg-red-50 border-red-200';
+  if (score >= 90) color = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  else if (score >= 75) color = 'text-blue-700 bg-blue-50 border-blue-200';
+  else if (score >= 60) color = 'text-amber-700 bg-amber-50 border-amber-200';
+
+  const classification = data.classification || '';
+  const components = data.components || {};
+  const labels = {
+    qualification: 'Kualifikasi',
+    financial: 'Keuangan',
+    experience: 'Pengalaman',
+    deadline: 'Deadline',
+    strategic: 'Strategis',
+  };
+  const bars = Object.keys(labels).map(k => {
+    const c = components[k] || {};
+    const v = (typeof c === 'object') ? (c.score != null ? c.score : 0) : c;
+    const available = (typeof c === 'object') ? (c.available !== false) : true;
+    let barColor = 'bg-red-400';
+    if (v >= 85) barColor = 'bg-emerald-400';
+    else if (v >= 70) barColor = 'bg-blue-400';
+    else if (v >= 50) barColor = 'bg-amber-400';
+    const scoreLabel = available ? v : '—';
+    return '<div class="flex items-center gap-2">' +
+      '<span class="text-[9px] text-slate-500 w-16 text-right">' + labels[k] + '</span>' +
+      '<div class="flex-1 bg-slate-200 rounded-full h-1.5">' +
+        '<div class="' + barColor + ' h-1.5 rounded-full" style="width:' + (available ? v : 0) + '%"></div>' +
+      '</div>' +
+      '<span class="text-[9px] font-semibold text-slate-700 w-6 text-right">' + scoreLabel + '</span>' +
+    '</div>';
+  }).join('');
+
+  const explanation = (data.explanation || []).slice(0, 4);
+  const explanationHtml = explanation.length
+    ? '<div class="mt-2 space-y-0.5">' + explanation.map(e => '<div class="text-[9px] text-slate-500">' + esc(e) + '</div>').join('') + '</div>'
+    : '';
+
+  container.innerHTML =
+    '<div class="flex items-center gap-3 mb-2">' +
+      '<span class="px-3 py-1 rounded-full text-sm font-bold border ' + color + '">' + score + '%</span>' +
+      '<span class="text-[10px] text-slate-400">' + esc(classification.replace(/_/g, ' ')) + '</span>' +
+    '</div>' +
+    '<div class="space-y-1">' + bars + '</div>' +
+    explanationHtml;
+}
+
+/* ===== PIPELINE SUMMARY ===== */
+async function loadPipelineSummary() {
+  try {
+    const resp = await fetch('/api/pipeline/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.getElementById('pipe-belum').textContent = (data.belum_diproses || 0);
+    document.getElementById('pipe-submit').textContent = (data.sudah_submit || 0);
+    document.getElementById('pipe-menang').textContent = (data.menang || 0);
+    document.getElementById('pipe-gagal').textContent = (data.gagal || 0);
+
+    const urg = data.urgency || {};
+    const urgEl = document.getElementById('pipe-urgency');
+    if (urgEl) {
+      const u3 = urg.deadline_under_3_days || 0;
+      const u7 = urg.deadline_under_7_days || 0;
+      if (u3 > 0) {
+        urgEl.innerHTML = '<span class="text-red-600 font-bold">' + u3 + '</span> deadline &lt;3 hari' +
+          (u7 > 0 ? ', <span class="text-amber-600 font-bold">' + u7 + '</span> &lt;7 hari' : '');
+        urgEl.classList.remove('hidden');
+      } else if (u7 > 0) {
+        urgEl.innerHTML = '<span class="text-amber-600 font-bold">' + u7 + '</span> deadline &lt;7 hari';
+        urgEl.classList.remove('hidden');
+      } else {
+        urgEl.classList.add('hidden');
+      }
+    }
+  } catch (e) { /* silent */ }
+}
+
+/* ===== RECOMMENDED TENDERS ===== */
+async function fetchRecommended() {
+  const tbody = document.getElementById('results-body');
+  tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center"><span class="text-xs text-slate-400">Memuat rekomendasi...</span></td></tr>';
+
+  try {
+    const resp = await fetch('/api/recommended/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await resp.json();
+    const items = data.items || [];
+
+    document.getElementById('tab-count-recommended').textContent = items.length;
+    document.getElementById('total-count-sidebar').textContent = items.length.toLocaleString('id-ID');
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-16 text-center text-slate-400"><div class="text-xs">Tidak ada rekomendasi. Lengkapi profil perusahaan dan KBLI.</div></td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = items.map(r => {
+      const tahapBadge = getTahapBadge(r.tahap_saat_ini, false);
+      const itBadge = r.is_it_priority
+        ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1">🔥 IT</span>'
+        : '';
+      const recColor = (r.opportunity_score || 0) >= 90 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+        : (r.opportunity_score || 0) >= 75 ? 'text-blue-700 bg-blue-50 border-blue-200'
+        : (r.opportunity_score || 0) >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+        : 'text-red-700 bg-red-50 border-red-200';
+      const reasonStr = r.reason ? '<div class="text-[9px] text-slate-400 mt-0.5 italic">' + esc(r.reason) + '</div>' : '';
+      const strengthStr = (r.strengths || []).length
+        ? '<div class="text-[8px] text-emerald-600 mt-0.5">' + r.strengths.slice(0, 2).map(s => '✓ ' + esc(s)).join(' · ') + '</div>'
+        : '';
+
+      return '<tr class="hover:bg-blue-50/40 transition-colors fade-in">' +
+        '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left">' + esc(r.id_lelang || String(r.id)) + '</button></td>' +
+        '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="text-left w-full cursor-pointer"><div class="text-xs font-semibold text-slate-800 leading-snug">' + esc(r.nama_paket) + itBadge + '</div><div class="text-[10px] text-slate-400 mt-0.5">' + esc(r.instansi) + '</div>' + reasonStr + strengthStr + '</button></td>' +
+        '<td class="px-4 py-3 text-xs text-slate-600">' + esc(r.instansi) + '</td>' +
+        '<td class="px-4 py-3">' + tahapBadge + '</td>' +
+        '<td class="px-4 py-3 text-center"><span class="text-slate-300 text-[10px]">&mdash;</span></td>' +
+        '<td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">&mdash;</td>' +
+        '<td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700">' + esc(r.hps_short) + '</td>' +
+        '<td class="px-4 py-3 text-center">' + renderPersistedAiScore(r) + '</td>' +
+        '<td class="px-4 py-3 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + recColor + '">' + (r.opportunity_score || 0) + '% ' + esc(r.recommendation) + '</span></td>' +
+      '</tr>';
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-red-400 text-xs">Gagal memuat rekomendasi</td></tr>';
+  }
+}
+
+/* ===== TENDER RADAR ===== */
+let radarState = { active: 'all', expanded: false };
+
+function toggleRadar() {
+  radarState.expanded = !radarState.expanded;
+  const body = document.getElementById('radar-body');
+  const chevron = document.getElementById('radar-chevron');
+  if (radarState.expanded) {
+    body.classList.remove('hidden');
+    chevron.style.transform = 'rotate(180deg)';
+    if (!radarState.loaded) loadRadar(radarState.active);
+  } else {
+    body.classList.add('hidden');
+    chevron.style.transform = '';
+  }
+}
+
+function setRadarFilterBtn(active) {
+  document.querySelectorAll('.radar-filter').forEach(btn => {
+    const isActive = btn.dataset.rf === (active || 'all');
+    if (isActive) {
+      btn.className = 'radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors bg-indigo-50 text-indigo-700 border-indigo-200';
+    } else {
+      btn.className = 'radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50';
+    }
+  });
+}
+
+async function loadRadar(classification) {
+  radarState.active = classification || 'all';
+  setRadarFilterBtn(radarState.active);
+  radarState.loaded = true;
+  const container = document.getElementById('radar-results');
+  const loading = document.getElementById('radar-loading');
+  const countEl = document.getElementById('radar-count');
+  const subEl = document.getElementById('radar-subtitle');
+  loading.classList.remove('hidden');
+  container.innerHTML = '';
+
+  try {
+    let url = '/api/radar/?limit=15';
+    if (classification && classification !== 'all') {
+      url += '&classification=' + encodeURIComponent(classification);
+    }
+    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const data = await resp.json();
+    loading.classList.add('hidden');
+
+    if (data.status === 'empty') {
+      countEl.textContent = '0';
+      subEl.textContent = ('error' in data ? data.error : 'Belum ada peluang.');
+      container.innerHTML = '<div class="text-[11px] text-slate-400 italic py-3">' + esc(data.error || 'Lengkapi profil perusahaan untuk mendapatkan rekomendasi tender.') + '</div>';
+      return;
+    }
+
+    const items = data.results || [];
+    countEl.textContent = data.total || items.length;
+
+    if (items.length === 0) {
+      subEl.textContent = classification && classification !== 'all'
+        ? 'Tidak ada peluang untuk filter ini.'
+        : 'Belum ada peluang yang sesuai dengan profil perusahaan Anda.';
+      container.innerHTML = '<div class="text-[11px] text-slate-400 italic py-3">' +
+        (classification && classification !== 'all' ? 'Tidak ada peluang pada kategori ini.' : 'Belum ada peluang yang sesuai dengan profil perusahaan Anda.') + '</div>';
+      return;
+    }
+
+    subEl.textContent = data.total + ' peluang cocok untuk perusahaan Anda';
+
+    container.innerHTML = items.map(r => radarCard(r)).join('');
+  } catch (e) {
+    loading.classList.add('hidden');
+    countEl.textContent = '0';
+    container.innerHTML = '<div class="text-[11px] text-red-400 italic py-3">Gagal memuat Tender Radar.</div>';
+  }
+}
+
+function radarCard(r) {
+  const ai = r.ai_match || {};
+  const opp = r.opportunity || {};
+  const oppScore = opp.score || 0;
+  let oppColor = 'text-red-700 bg-red-50 border-red-200';
+  if (oppScore >= 90) oppColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  else if (oppScore >= 75) oppColor = 'text-blue-700 bg-blue-50 border-blue-200';
+  else if (oppScore >= 60) oppColor = 'text-amber-700 bg-amber-50 border-amber-200';
+
+  const aiScore = ai.fit_score || 0;
+  let aiColor = 'text-red-700 bg-red-50 border-red-200';
+  if (aiScore >= 71) aiColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  else if (aiScore >= 41) aiColor = 'text-amber-700 bg-amber-50 border-amber-200';
+
+  const itBadge = r.is_it_priority ? '<span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200">🔥 IT</span>' : '';
+  const hpsStr = formatHpsRadar(r.hps);
+
+  const deadlineStr = r.deadline_days_left != null
+    ? (r.deadline_days_left < 0 ? 'Deadline lewat' : (r.deadline_days_left === 0 ? 'Deadline hari ini' : (r.deadline_days_left + ' hari lagi')))
+    : 'Deadline tidak diketahui';
+
+  let aiHtml, oppHtml;
+  if (r.radar_status === 'NOT_READY') {
+    aiHtml = '<div class="text-[9px] text-slate-400 italic">Belum dianalisis AI.</div>';
+    oppHtml = '<div class="text-[9px] text-amber-700 italic">NOT READY — jalankan AI Match</div>';
+  } else {
+    aiHtml = '<div><span class="text-[9px] font-semibold text-slate-500">AI FIT</span><div class="text-[10px] ' + aiColor.split(' ')[0] + ' font-bold">' + aiScore + '/100</div></div>';
+    oppHtml = '<div><span class="text-[9px] font-semibold text-slate-500">OPPORTUNITY</span><div class="text-[10px] ' + oppColor.split(' ')[0] + ' font-bold">' + oppScore + '/100</div><div class="text-[8px] text-slate-400">' + esc((opp.classification || '').replace(/_/g, ' ')) + '</div></div>';
+  }
+
+  return '<div class="border border-slate-200 rounded-lg p-3 hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors">' +
+    '<div class="flex items-start justify-between gap-3">' +
+      '<div class="min-w-0">' +
+        '<button onclick="openTenderDetail(' + r.tender_id + ')" class="text-left text-xs font-semibold text-slate-800 hover:text-blue-600 cursor-pointer leading-snug">' + esc(r.title) + itBadge + '</button>' +
+        '<div class="text-[10px] text-slate-400 mt-0.5">' + esc(r.instansi || '') + (r.location ? ' · ' + esc(r.location) : '') + '</div>' +
+        '<div class="flex items-center gap-2 mt-1.5">' +
+          '<span class="text-[10px] font-mono font-semibold text-slate-700">' + hpsStr + '</span>' +
+          '<span class="text-[9px] text-slate-400">' + deadlineStr + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex items-center gap-3 flex-shrink-0">' +
+        aiHtml + oppHtml +
+        '<button onclick="openTenderDetail(' + r.tender_id + ')" class="px-2 py-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">Lihat</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function formatHpsRadar(hps) {
+  if (!hps) return 'HPS n/a';
+  if (hps >= 1000000000) {
+    const v = hps / 1000000000;
+    return 'Rp ' + (Number.isInteger(v) ? v : v.toFixed(1)).toString().replace('.', ',') + ' M';
+  }
+  if (hps >= 1000000) {
+    const v = hps / 1000000;
+    return 'Rp ' + (Number.isInteger(v) ? v : v.toFixed(1)).toString().replace('.', ',') + ' Jt';
+  }
+  return 'Rp ' + hps.toLocaleString('id-ID');
+}
+
+/* ===== INTELLIGENCE READINESS STATUS ===== */
+async function loadIntelligenceStatus() {
+  try {
+    const resp = await fetch('/api/intelligence/status/', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await resp.json();
+    const chip = document.getElementById('intel-readiness-chip');
+    const aiEl = document.getElementById('intel-ai-pct');
+    const oppEl = document.getElementById('intel-opp-pct');
+    const readyText = document.getElementById('intel-ready-text');
+
+    aiEl.textContent = (data.coverage?.ai_match_percent ?? 0) + '%';
+    oppEl.textContent = (data.coverage?.opportunity_score_percent ?? 0) + '%';
+
+    const counts = data.counts || {};
+    const level = data.readiness?.level || 'NOT_READY';
+
+    const levelStyles = {
+      READY: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      PARTIAL: 'bg-amber-50 text-amber-700 border-amber-200',
+      NOT_READY: 'bg-red-50 text-red-700 border-red-200',
+      EMPTY: 'bg-slate-50 text-slate-500 border-slate-200'
+    };
+    const levelLabels = { READY: 'READY', PARTIAL: 'PARTIAL', NOT_READY: 'NOT READY', EMPTY: 'EMPTY' };
+
+    if (data.status === 'empty') {
+      chip.textContent = 'EMPTY';
+      chip.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ' + levelStyles.EMPTY;
+      readyText.textContent = 'Lengkapi profil perusahaan untuk menilai kesiapan intelligence.';
+      readyText.className = 'text-[10px] text-slate-400';
+      return;
+    }
+
+    chip.textContent = levelLabels[level] || level;
+    chip.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ' + (levelStyles[level] || levelStyles.NOT_READY);
+    readyText.textContent = (data.message || '') +
+      ' (Tender ' + (counts.tenders ?? 0) + ' · AI ' + (counts.ai_matches ?? 0) +
+      ' · Siap ' + (counts.ready_opportunities ?? 0) + ')';
+    readyText.className = 'text-[10px] text-slate-500';
+  } catch (e) {
+    const chip = document.getElementById('intel-readiness-chip');
+    chip.textContent = 'ERROR';
+    chip.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-red-50 text-red-700 border-red-200';
+  }
+}
+
+function toggleMobileSidebar() {
+  let overlay = document.getElementById('mobile-sidebar-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'mobile-sidebar-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.4);display:flex;';
+    overlay.onclick = function(e) { if (e.target === overlay) toggleMobileSidebar(); };
+    const panel = document.querySelector('.sidebar-desktop').cloneNode(true);
+    panel.className = 'w-72 bg-white border-r border-slate-200 flex flex-col h-full overflow-y-auto';
+    panel.style.cssText = 'flex-shrink:0;';
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+  } else {
+    overlay.remove();
+  }
+}
+
+/* ===== INIT ===== */
+applyFilters();
+setInterval(fetchResults, 15000);
+setInterval(fetchFilterCounts, 30000);
+setInterval(fetchMonitorProgress, 3000);
+loadSubmissionStatuses();
+setInterval(loadSubmissionStatuses, 30000);
+loadWatchlist();
+loadPipelineSummary();
+setInterval(loadWatchlist, 60000);
+setInterval(loadPipelineSummary, 60000);
+loadRadar('all');
+loadIntelligenceStatus();
+setInterval(loadIntelligenceStatus, 30000);
+</script>
+
+</body>
+</html>

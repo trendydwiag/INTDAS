@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spse-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DJANGO_DEBUG=0
+      - SPSE_LOG_LEVEL=INFO
+      - SPSE_HEADLESS=1
+    volumes:
+      - crawler-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/crawl-progress/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spse-scheduler
+    command: python manage.py run_scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DJANGO_DEBUG=0
+      - SPSE_LOG_LEVEL=INFO
+      - SPSE_HEADLESS=1
+    volumes:
+      - crawler-data:/app/data
+    depends_on:
+      - web
+
+volumes:
+  crawler-data:
+    driver: local
