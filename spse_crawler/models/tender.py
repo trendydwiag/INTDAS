@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator
+
+
+def _now_utc() -> datetime:
+    """Return current timezone-aware datetime in UTC."""
+    return datetime.now(timezone.utc)
 
 
 class TenderPackage(BaseModel):
@@ -69,7 +74,7 @@ class TenderPackage(BaseModel):
         description="Full URL to the pengumuman (announcement) page.",
     )
     scraped_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=_now_utc,
         description="Timestamp when this record was scraped.",
     )
 
@@ -211,7 +216,7 @@ class TenderDetail(BaseModel):
     )
 
     scraped_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=_now_utc,
         description="Timestamp when this detail was scraped.",
     )
 

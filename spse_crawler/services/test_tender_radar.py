@@ -40,7 +40,7 @@ def _mk_user(company, email="user@alpha.co.id", role="company_admin", username="
 
 
 def _mk_tender(kode="000001", idl="T-001", name="Sistem Informasi", hps=1_000_000_000,
-               tahap="Penawaran", kbli="62019", it=False, days=15, location="Jakarta"):
+               tahap="pengumuman prakualifikasi [...]", kbli="62019", it=False, days=15, location="Jakarta"):
     return TenderResult.objects.create(
         kode_instansi=kode, id_lelang=idl, nama_paket=name, instansi="Kementerian",
         hps=hps, tahap_saat_ini=tahap, kbli_code=kbli, is_it_priority=it,

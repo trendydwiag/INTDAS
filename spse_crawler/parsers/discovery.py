@@ -29,19 +29,22 @@ class DiscoveryParser:
       3. Parse each row into a ``TenderPackage``
     """
 
-    # Keywords in the Status column [3] that indicate the package is ABORTED
-    # (cancelled / failed) and should be skipped at discovery.
+    # Keywords in the Status column [3] that indicate the package is ABORTED,
+    # COMPLETED, or NON-ACTIONABLE (cancelled/failed/finished/pascakualifikasi)
+    # and should be skipped at discovery.
     #
-    # Advertised / decided / completed statuses (selesai, kontrak, dikontrak,
-    # penandatanganan, pengumuman pemenang, ...) are deliberately NOT skipped
-    # here — those packages flow through to Stage 2, where ``is_eligible_tahap``
-    # / ``is_retained_tahap`` make the final retention decision (Phase 5 / 6A:
-    # awarded/completed tenders are retained so historical participant/winner
-    # data can be captured).
+    # Completed tenders ("selesai", "pascakualifikasi", "penandatanganan") cannot
+    # be submitted to and are considered garbage data unless the user already has
+    # a submission on record (that exemption is enforced at purge-time).
     _SKIP_STATUS_KEYWORDS: tuple[str, ...] = (
         "batal",
         "gagal",
         "pembatalan",
+        "selesai",
+        "tender selesai",
+        "pascakualifikasi",
+        "penandatanganan",
+        "penandatanganan kontrak",
     )
 
     # DataTables columns for /dt/lelang (16 columns)

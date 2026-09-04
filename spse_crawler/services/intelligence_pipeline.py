@@ -126,10 +126,12 @@ def enqueue_new_after_crawl(cap: int | None = None) -> int:
          .exclude(tahap_saat_ini__icontains="dibatalkan")
          .exclude(tahap_saat_ini__icontains="gugur")
     )
+    from spse_crawler.services.tender_status import is_submittable_tender
+
     candidate_ids = []
-    for tid in qs.order_by("-scraped_at").values_list("id", flat=True)[:cap * 4]:
-        if tid not in have_job:
-            candidate_ids.append(tid)
+    for t in qs.order_by("-scraped_at")[:cap * 4]:
+        if is_submittable_tender(t) and t.id not in have_job:
+            candidate_ids.append(t.id)
         if len(candidate_ids) >= cap:
             break
 
@@ -269,6 +271,13 @@ def _run_ai_match(job: IntelligenceJob) -> tuple[bool, str | None, str | None]:
     """
     from spse_crawler.ai_match.matcher import run_match
     from spse_crawler.ai_match.models import AIMatchResult
+    from spse_crawler.services.tender_status import is_submittable_tender
+    from spse_crawler.web.models import TenderResult
+
+    # Verify active submittable status before executing AI Match
+    tender = TenderResult.objects.filter(id=job.tender_id).first()
+    if not is_submittable_tender(tender):
+        return False, False, "tender_not_submittable"
 
     # Idempotency: if a valid AIMatchResult already exists, do not call LLM.
     existing = AIMatchResult.objects.filter(
@@ -319,6 +328,12 @@ def _job_missing_entity(job: IntelligenceJob) -> bool:
 def _run_opportunity_score(job: IntelligenceJob) -> tuple[bool, str | None, str | None]:
     """Execute Opportunity Score v0.1 for a job. Never raises, never fabricates."""
     from spse_crawler.services.opportunity_scorer_v01 import OpportunityScorerV01 as Scorer
+    from spse_crawler.services.tender_status import is_submittable_tender
+    from spse_crawler.web.models import TenderResult
+
+    tender = TenderResult.objects.filter(id=job.tender_id).first()
+    if not is_submittable_tender(tender):
+        return False, False, "tender_not_submittable"
 
     try:
         obj = Scorer.calculate(tender_id=job.tender_id, company_id=job.company_id)

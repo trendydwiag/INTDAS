@@ -60,7 +60,7 @@ def _create_fixtures(**overrides):
         nama_paket=overrides.get("nama_paket", "Pengadaan Sistem Informasi"),
         instansi=overrides.get("instansi", "Kementerian IT"),
         hps=overrides.get("hps", 500_000_000),
-        tahap_saat_ini=overrides.get("tahap_saat_ini", "Prakualifikasi"),
+        tahap_saat_ini=overrides.get("tahap_saat_ini", "pengumuman prakualifikasi [...]"),
         is_prakualifikasi=overrides.get("is_prakualifikasi", True),
         kbli_code=overrides.get("kbli_code", "62019"),
         is_it_priority=overrides.get("is_it_priority", True),
@@ -481,7 +481,7 @@ class ClassificationTests(TestCase):
         tender_ly = TenderResult.objects.create(
             kode_instansi="CL-LY", id_lelang="T-CL-LY",
             nama_paket="Test", instansi="Test",
-            hps=500_000_000, tahap_saat_ini="Prakualifikasi",
+            hps=500_000_000, tahap_saat_ini="pengumuman prakualifikasi [...]",
             jadwal_json=[{"tahap": "Penawaran", "sampai": (timezone.now().date() + timedelta(days=20)).strftime("%d-%m-%Y")}],
         )
         AIMatchResult.objects.create(
@@ -501,7 +501,7 @@ class ClassificationTests(TestCase):
         tender_pt = TenderResult.objects.create(
             kode_instansi="CL-PT", id_lelang="T-CL-PT",
             nama_paket="Test", instansi="Test",
-            hps=500_000_000, tahap_saat_ini="Prakualifikasi",
+            hps=500_000_000, tahap_saat_ini="pengumuman prakualifikasi [...]",
             jadwal_json=[{"tahap": "Penawaran", "sampai": (timezone.now().date() + timedelta(days=30)).strftime("%d-%m-%Y")}],
         )
         AIMatchResult.objects.create(

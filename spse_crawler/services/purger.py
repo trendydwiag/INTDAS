@@ -74,6 +74,7 @@ def flush_non_retained() -> FlushResult:
     function intentionally never targets retained tenders.
     """
     from spse_crawler.parsers.detail import DetailParser
+    from spse_crawler.submissions.models import TenderSubmissionStatus
 
     retained_condition = Q()
     for kw in DetailParser._TAHAP_ACCEPT_KEYWORDS:
@@ -81,9 +82,16 @@ def flush_non_retained() -> FlushResult:
     for kw in DetailParser._TAHAP_AWARDED_KEYWORDS:
         retained_condition |= Q(tahap_saat_ini__icontains=kw)
 
+    exempt_tender_ids = set(
+        TenderSubmissionStatus.objects.filter(
+            status__in=_SUBMITTED_STATUSES,
+        ).values_list("tender_id", flat=True)
+    )
+
     qs = (
         TenderResult.objects.filter(is_prakualifikasi=False)
         .exclude(retained_condition)
+        .exclude(id__in=exempt_tender_ids)
     )
     count = qs.count()
     qs.delete()
@@ -101,13 +109,70 @@ def flush_all() -> FlushResult:
     return FlushResult(mode="all", deleted_count=count, remaining_count=remaining)
 
 
+# Keywords that mark a tender as COMPLETED / NON-ACTIONABLE.
+_COMPLETED_TAHAP_PATTERNS: tuple[str, ...] = (
+    "selesai",
+    "tender selesai",
+    "pascakualifikasi",
+    "penandatanganan",
+    "penandatanganan kontrak",
+)
+
+# Submission statuses that indicate the user has actively engaged with
+# a tender — these tenders are EXEMPT from completed-tender purging.
+_SUBMITTED_STATUSES: tuple[str, ...] = (
+    "sudah_submit",
+    "menang",
+    "cocok_diproses",
+)
+
+
+def purge_completed_tenders() -> FlushResult:
+    """Remove completed/finished tenders that have no active submission.
+
+    A tender with ``tahap_saat_ini`` containing "selesai" is considered
+    completed and therefore un-actionable.  However, if the user's company
+    has already submitted (``TenderSubmissionStatus`` with status
+    ``sudah_submit`` or ``menang``), the tender is EXEMPT and kept for
+    monitoring purposes.
+
+    This prevents the database from accumulating garbage data — completed
+    tenders that can no longer be participated in.
+    """
+    from spse_crawler.submissions.models import TenderSubmissionStatus
+
+    # Build "completed" condition
+    completed_q = Q()
+    for pattern in _COMPLETED_TAHAP_PATTERNS:
+        completed_q |= Q(tahap_saat_ini__icontains=pattern)
+
+    # Find tender IDs that have an active submission (exempt from purge)
+    exempt_tender_ids = set(
+        TenderSubmissionStatus.objects.filter(
+            status__in=_SUBMITTED_STATUSES,
+        ).values_list("tender_id", flat=True)
+    )
+
+    qs = TenderResult.objects.filter(completed_q).exclude(id__in=exempt_tender_ids)
+    count = qs.count()
+    qs.delete()
+    remaining = TenderResult.objects.count()
+    logger.info(
+        "[PURGE] completed: deleted {} (exempted {} with submissions), remaining {}",
+        count, len(exempt_tender_ids), remaining,
+    )
+    return FlushResult(mode="completed", deleted_count=count, remaining_count=remaining)
+
+
 def flush(mode: str = "non_prakualifikasi") -> FlushResult:
     """Dispatch to the correct flush function based on mode."""
     if mode == "non_prakualifikasi":
         return flush_non_prakualifikasi()
     elif mode == "inactive":
         return flush_inactive()
+    elif mode == "completed":
+        return purge_completed_tenders()
     elif mode == "all":
         return flush_all()
     else:
-        raise ValueError(f"Unknown flush mode: {mode!r}. Use 'non_prakualifikasi', 'inactive', or 'all'.")
+        raise ValueError(f"Unknown flush mode: {mode!r}. Use 'non_prakualifikasi', 'inactive', 'completed', or 'all'.")

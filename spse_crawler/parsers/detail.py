@@ -265,20 +265,25 @@ class DetailParser:
     # Tahap Eligibility Filter
     # ------------------------------------------------------------------
 
-    # Keywords that mark a package as ABORTED (never stored — cancelled/failed).
+    # Keywords that mark a package as ABORTED (never stored — cancelled/failed/completed/non-actionable).
     _TAHAP_ABORTED_KEYWORDS: tuple[str, ...] = (
         "pembatalan",
         "batal",
         "gagal",
-    )
-
-    # Keywords that mark a package as AWARDED / COMPLETED (retained, not
-    # prakualifikasi). Phase 5: these are retained so participant + future
-    # winner data can be captured, instead of being dropped by the crib gate.
-    _TAHAP_AWARDED_KEYWORDS: tuple[str, ...] = (
         "selesai",
         "tender selesai",
+        "pascakualifikasi",
         "penandatanganan",
+        "penandatanganan kontrak",
+    )
+
+    # Keywords that mark a package as AWARDED / IN-PROGRESS (retained, not
+    # prakualifikasi). Phase 5: these are retained so participant + future
+    # winner data can be captured, instead of being dropped by the crib gate.
+    # Note: "selesai", "pascakualifikasi", and "penandatanganan" are moved to
+    # ABORTED — non-actionable tenders that should not be stored unless
+    # the user has an active submission.
+    _TAHAP_AWARDED_KEYWORDS: tuple[str, ...] = (
         "kontrak",
         "penetapan pemenang",
         "pengumuman pemenang",
