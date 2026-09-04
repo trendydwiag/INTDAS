@@ -107,6 +107,11 @@ def is_eligible(tender, company) -> tuple[bool, str | None, str | None]:
     if tender is None:
         return False, None, "missing_tender"
 
+    from spse_crawler.services.tender_status import is_submittable_tender
+
+    if not is_submittable_tender(tender):
+        return False, "tender_not_submittable", None
+
     if is_terminal_stage(tender):
         return False, "insufficient_tender_data", None
 
@@ -121,11 +126,14 @@ def is_eligible(tender, company) -> tuple[bool, str | None, str | None]:
 
 def eligibility_summary(tender, company) -> dict:
     """Return a structured eligibility summary (for observability)."""
+    from spse_crawler.services.tender_status import is_submittable_tender
+
     eligible, skip_reason, error_reason = is_eligible(tender, company)
     return {
         "eligible": eligible,
         "skip_reason": skip_reason,
         "error_reason": error_reason,
+        "submittable": is_submittable_tender(tender) if tender else False,
         "terminal": is_terminal_stage(tender) if tender else None,
         "expired": is_expired(tender) if tender else None,
         "usable_text_len": len(usable_requirement_text(tender)) if tender else 0,

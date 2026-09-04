@@ -20,7 +20,6 @@ class DiscoveryEligibilityRetentionTests(TestCase):
     def test_active_tender_is_discovered(self):
         for status in [
             "pengumuman prakualifikasi",
-            "pengumuman pascakualifikasi",
             "evaluasi administrasi",
             "pembuktian kualifikasi",
             "pengumuman",
@@ -42,18 +41,30 @@ class DiscoveryEligibilityRetentionTests(TestCase):
                 f"awarded status should be discovered: {status!r}",
             )
 
-    def test_decided_completed_tender_is_discovered(self):
+    def test_decided_in_progress_tender_is_discovered(self):
         for status in [
-            "selesai",
-            "tender selesai",
             "kontrak",
             "dikontrak",
-            "penandatanganan kontrak",
-            "penandatanganan",
         ]:
             self.assertTrue(
                 DiscoveryParser._is_eligible_status(status),
-                f"decided/completed status should be discovered: {status!r}",
+                f"decided/in-progress status should be discovered: {status!r}",
+            )
+
+    def test_completed_tender_is_filtered_at_discovery(self):
+        """Completed & non-actionable tenders cannot be submitted and must be filtered at discovery."""
+        for status in [
+            "selesai",
+            "tender selesai",
+            "Tender Sudah Selesai",
+            "pascakualifikasi",
+            "pengumuman pascakualifikasi",
+            "penandatanganan",
+            "penandatanganan kontrak",
+        ]:
+            self.assertFalse(
+                DiscoveryParser._is_eligible_status(status),
+                f"completed/non-actionable status should be filtered at discovery: {status!r}",
             )
 
     def test_aborted_tender_is_still_filtered(self):
@@ -77,8 +88,10 @@ class DiscoveryEligibilityRetentionTests(TestCase):
         # Unknown status is not dropped at discovery; Stage 2 decides retention.
         self.assertTrue(DiscoveryParser._is_eligible_status("tidak diketahui"))
 
-    def test_skip_keywords_exclude_awarded_completed(self):
-        """Regression guard: awarded/completed keywords must NOT be in the
-        discovery skip set (they must flow through to Stage 2 retention)."""
-        for kw in ("selesai", "kontrak", "dikontrak", "penandatanganan"):
+    def test_skip_keywords_exclude_in_progress_awarded(self):
+        """Regression guard: in-progress awarded keywords must NOT be in the
+        discovery skip set, but completed/non-actionable keywords MUST be in the skip set."""
+        for kw in ("kontrak", "dikontrak"):
             self.assertNotIn(kw, DiscoveryParser._SKIP_STATUS_KEYWORDS, kw)
+        for kw in ("selesai", "tender selesai", "pascakualifikasi", "penandatanganan", "penandatanganan kontrak"):
+            self.assertIn(kw, DiscoveryParser._SKIP_STATUS_KEYWORDS, kw)

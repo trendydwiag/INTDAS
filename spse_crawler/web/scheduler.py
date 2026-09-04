@@ -292,14 +292,19 @@ async def _do_crawl() -> None:
         logger.info("[SCHEDULER] Completed — {} saved, {} skipped, {} errors", total, skipped, errors)
 
         # Post-crawl housekeeping: safely remove stale/non-retained records.
-        # Historical awarded/decided/completed tenders are NEVER purged here
+        # Historical awarded/decided tenders are NEVER purged here
         # (Phase 6A — historical retention). See flush_non_retained().
+        # Completed ("selesai") tenders without active submissions are purged
+        # by purge_completed_tenders() — they are garbage data.
         @sync_to_async
         def _auto_purge():
-            from spse_crawler.services.purger import flush_non_retained
+            from spse_crawler.services.purger import flush_non_retained, purge_completed_tenders
             result = flush_non_retained()
             if result.deleted_count > 0:
                 logger.info("[SCHEDULER] Auto-purge: removed {} non-retained records", result.deleted_count)
+            completed_result = purge_completed_tenders()
+            if completed_result.deleted_count > 0:
+                logger.info("[SCHEDULER] Auto-purge: removed {} completed records", completed_result.deleted_count)
 
         await _auto_purge()
 

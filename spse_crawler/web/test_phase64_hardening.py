@@ -69,6 +69,7 @@ class AIProviderFallbackHardeningTestCase(TestCase):
                 id_lelang="8888001",
                 nama_paket="Pengadaan Server IT",
                 hps=500000000,
+                tahap_saat_ini="pengumuman prakualifikasi [...]",
             )
             company = CompanyProfile.objects.create(
                 name="PT IT Solusindo",
@@ -94,6 +95,7 @@ class AIProviderFallbackHardeningTestCase(TestCase):
             id_lelang="8888002",
             nama_paket="Pengadaan Jaringan Fiber",
             hps=300000000,
+            tahap_saat_ini="pengumuman prakualifikasi [...]",
         )
         company = CompanyProfile.objects.create(
             name="PT Fiberindo",

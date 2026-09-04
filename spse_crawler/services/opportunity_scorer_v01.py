@@ -158,6 +158,33 @@ class OpportunityScorerV01:
         except CompanyProfile.DoesNotExist:
             raise ValueError(f"Company #{company_id} not found")
 
+        # Active submittable tender guard
+        from spse_crawler.services.tender_status import is_submittable_tender
+
+        if not is_submittable_tender(tender):
+            existing = OpportunityScore.objects.filter(tender=tender, company=company).first()
+            if existing:
+                return existing
+            obj, _ = OpportunityScore.objects.update_or_create(
+                tender=tender,
+                company=company,
+                defaults={
+                    "status": "not_ready",
+                    "qualification_score": 0,
+                    "financial_score": 0,
+                    "experience_score": 0,
+                    "deadline_score": 0,
+                    "strategic_score": 0,
+                    "final_score": 0,
+                    "classification": "TIDAK_DIREKOMENDASIKAN",
+                    "breakdown_json": {
+                        "message": "Tender tidak dalam status submittable (Pengumuman Prakualifikasi).",
+                    },
+                    "calculation_version": VERSION,
+                },
+            )
+            return obj
+
         # Check AIMatchResult — hard prerequisite
         try:
             ai_match = AIMatchResult.objects.get(tender=tender, company=company)

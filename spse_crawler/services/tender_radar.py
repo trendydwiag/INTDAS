@@ -188,8 +188,13 @@ class TenderRadarService:
         # classification/score ordering that happens in Python).
         candidates = list(qs.order_by("-priority_score", "-hps")[: int(limit) * 4 + offset])
 
+        from spse_crawler.services.tender_status import is_submittable_tender
+
         results = []
         for t in candidates:
+            if not is_submittable_tender(t):
+                continue
+
             opp = opp_map.get(t.id)
 
             if opp is not None and opp.status == "ready":

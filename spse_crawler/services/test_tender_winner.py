@@ -152,6 +152,11 @@ class WinnerPydanticTests(TestCase):
         d.winner = {"company_name": "CV. Athalla Putra Kusma", "winning_value": 855301311}
         self.assertEqual(d.winner["company_name"], "CV. Athalla Putra Kusma")
 
+    def test_scraped_at_is_timezone_aware(self):
+        d = TenderDetail(kode_instansi="jabarprov", id_lelang="10158980000", tahap_saat_ini="pengumuman pemenang")
+        self.assertIsNotNone(d.scraped_at.tzinfo)
+        self.assertIsNotNone(d.scraped_at.utcoffset())
+
 
 # ---------------------------------------------------------------------------
 # TenderWinner model

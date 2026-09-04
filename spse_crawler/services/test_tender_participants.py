@@ -197,12 +197,16 @@ class TahapGateTests(TestCase):
         self.assertTrue(DetailParser.is_eligible_tahap("pengumuman prakualifikasi"))
 
     def test_awarded_retained_not_eligible(self):
-        for tahap in ["penetapan pemenang", "kontrak", "selesai", "penandatanganan kontrak", "rekomendasi pemenang"]:
+        for tahap in ["penetapan pemenang", "kontrak", "rekomendasi pemenang"]:
             self.assertFalse(DetailParser.is_eligible_tahap(tahap), tahap)
             self.assertTrue(DetailParser.is_retained_tahap(tahap), tahap)
 
     def test_aborted_not_retained(self):
-        for tahap in ["pembatalan", "batal", "gagal", "tender gagal"]:
+        for tahap in [
+            "pembatalan", "batal", "gagal", "tender gagal",
+            "selesai", "tender selesai",
+            "pascakualifikasi", "penandatanganan", "penandatanganan kontrak",
+        ]:
             self.assertFalse(DetailParser.is_retained_tahap(tahap), tahap)
 
     def test_unknown_not_retained(self):
@@ -214,6 +218,39 @@ class TahapGateTests(TestCase):
 
 
 class TenderDetailPydanticTests(TestCase):
+    def test_scraped_at_is_timezone_aware(self):
+        """Verify TenderDetail.scraped_at has non-None tzinfo and utcoffset."""
+        d = TenderDetail(
+            kode_instansi="dki",
+            id_lelang="12345",
+            tahap_saat_ini="pengumuman prakualifikasi",
+        )
+        self.assertIsNotNone(d.scraped_at.tzinfo)
+        self.assertIsNotNone(d.scraped_at.utcoffset())
+
+    def test_scraped_at_django_persistence_no_naive_warning(self):
+        """Verify passing detail.scraped_at to Django DateTimeField produces zero naive warnings."""
+        import warnings
+        tender = _mk_tender()
+        d = TenderDetail(
+            kode_instansi="dki",
+            id_lelang="12345",
+            tahap_saat_ini="pengumuman prakualifikasi",
+        )
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            tp, _ = TenderParticipant.objects.update_or_create(
+                tender=tender,
+                name="PT Timezone Test",
+                defaults={"source_fetched_at": d.scraped_at},
+            )
+            naive_warnings = [
+                w for w in captured
+                if issubclass(w.category, RuntimeWarning) and "naive datetime" in str(w.message).lower()
+            ]
+            self.assertEqual(len(naive_warnings), 0)
+            tp.delete()
+
     def test_participants_default_empty(self):
         d = TenderDetail(
             kode_instansi="dki",
