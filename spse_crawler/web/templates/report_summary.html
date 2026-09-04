@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Summary — SPSE Inaproc</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } },
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    @keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .count-up { animation: countUp 0.3s ease-out; }
+  </style>
+</head>
+<body class="h-full">
+
+<div class="min-h-full flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
+    <div class="flex items-center justify-between max-w-6xl mx-auto">
+      <div class="flex items-center gap-3">
+        <a href="/" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <div>
+          <h1 class="text-base font-bold text-slate-800">Report Summary</h1>
+          <p class="text-[11px] text-slate-400">Ringkasan Eksekutif Tender & Potensi Omset</p>
+        </div>
+      </div>
+      <div class="text-[10px] text-slate-400" id="report-date"></div>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="flex-1 overflow-y-auto px-6 py-6">
+    <div class="max-w-6xl mx-auto space-y-6">
+
+      <!-- Metric Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Total Tender</div>
+          <div class="text-2xl font-bold text-slate-800 count-up" id="m-total">0</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-[10px] uppercase tracking-wider text-violet-400 font-semibold mb-1">Berpotensi (Kecocokan &gt; 60%)</div>
+          <div class="text-2xl font-bold text-violet-700 count-up" id="m-potensi">0</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-[10px] uppercase tracking-wider text-amber-400 font-semibold mb-1">Belum Di-submit</div>
+          <div class="text-2xl font-bold text-amber-600 count-up" id="m-belum">0</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold mb-1">Sudah Di-submit</div>
+          <div class="text-2xl font-bold text-emerald-600 count-up" id="m-submit">0</div>
+        </div>
+      </div>
+
+      <!-- Omset Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gradient-to-br from-violet-50 to-white rounded-xl border border-violet-200 p-5">
+          <div class="text-[10px] uppercase tracking-wider text-violet-400 font-semibold mb-1">Total Potensi Omset</div>
+          <div class="text-xl md:text-2xl font-bold text-violet-700 count-up" id="o-potensi">Rp 0</div>
+          <div class="text-[10px] text-violet-400 mt-1">Total HPS dari tender berpotensi</div>
+        </div>
+        <div class="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-200 p-5">
+          <div class="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-1">Omset Submitted</div>
+          <div class="text-xl md:text-2xl font-bold text-blue-700 count-up" id="o-submit">Rp 0</div>
+          <div class="text-[10px] text-blue-400 mt-1">Total HPS dari tender yang sudah submit</div>
+        </div>
+        <div class="bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-200 p-5">
+          <div class="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold mb-1">Omset Menang</div>
+          <div class="text-xl md:text-2xl font-bold text-emerald-700 count-up" id="o-menang">Rp 0</div>
+          <div class="text-[10px] text-emerald-400 mt-1">Total HPS dari tender yang dimenangkan</div>
+        </div>
+      </div>
+
+      <!-- Win Rate -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <div class="flex items-center gap-4">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Win Rate</div>
+          <div class="flex-1 bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div id="winrate-bar" class="bg-emerald-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <div class="text-sm font-bold text-emerald-700" id="winrate-text">0%</div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Top Instansi -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+          <div class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Top Instansi (Berpotensi)</div>
+          <div id="chart-instansi" class="space-y-2"></div>
+        </div>
+        <!-- Tahap Distribution -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+          <div class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Distribusi Tahapan</div>
+          <div id="chart-tahap" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+function fmtRp(n) {
+  if (!n || n === 0) return 'Rp 0';
+  if (n >= 1e12) return 'Rp ' + (n / 1e12).toFixed(1) + ' T';
+  if (n >= 1e9) return 'Rp ' + (n / 1e9).toFixed(1) + ' M';
+  if (n >= 1e6) return 'Rp ' + (n / 1e6).toFixed(1) + ' Jt';
+  return 'Rp ' + n.toLocaleString('id-ID');
+}
+
+function renderBarChart(containerId, items, labelKey, countKey, color) {
+  const el = document.getElementById(containerId);
+  if (!items || items.length === 0) {
+    el.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Tidak ada data</div>';
+    return;
+  }
+  const max = Math.max(...items.map(i => i[countKey]));
+  el.innerHTML = items.map(i => {
+    const pct = max > 0 ? (i[countKey] / max * 100) : 0;
+    const label = (i[labelKey] || '').substring(0, 40);
+    return '<div class="flex items-center gap-2">' +
+      '<div class="w-32 text-[10px] text-slate-500 truncate" title="' + label + '">' + label + '</div>' +
+      '<div class="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">' +
+        '<div class="' + color + ' h-4 rounded-full transition-all duration-500" style="width: ' + pct + '%"></div>' +
+      '</div>' +
+      '<div class="w-8 text-[10px] text-slate-600 font-mono text-right">' + i[countKey] + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function loadReport() {
+  document.getElementById('report-date').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  try {
+    const resp = await fetch('/api/reports/summary/');
+    const data = await resp.json();
+
+    const c = data.counts || {};
+    const o = data.omset || {};
+
+    document.getElementById('m-total').textContent = (c.total || 0).toLocaleString('id-ID');
+    document.getElementById('m-potensi').textContent = (c.berpotensi || 0).toLocaleString('id-ID');
+    document.getElementById('m-belum').textContent = (c.belum_submit || 0).toLocaleString('id-ID');
+    document.getElementById('m-submit').textContent = (c.sudah_submit || 0).toLocaleString('id-ID');
+
+    document.getElementById('o-potensi').textContent = fmtRp(o.total_potensi);
+    document.getElementById('o-submit').textContent = fmtRp(o.total_submitted);
+    document.getElementById('o-menang').textContent = fmtRp(o.total_menang);
+
+    // Win rate
+    const submitted = c.sudah_submit || 0;
+    const won = c.menang || 0;
+    const winRate = submitted > 0 ? Math.round(won / submitted * 100) : 0;
+    document.getElementById('winrate-bar').style.width = winRate + '%';
+    document.getElementById('winrate-text').textContent = winRate + '%';
+
+    // Charts
+    renderBarChart('chart-instansi', data.by_instansi, 'instansi', 'count', 'bg-violet-400');
+    renderBarChart('chart-tahap', data.by_tahap, 'tahap_saat_ini', 'count', 'bg-blue-400');
+  } catch (e) {
+    console.error('Failed to load report:', e);
+  }
+}
+
+loadReport();
+</script>
+</body>
+</html>
