@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SPSE Inaproc — Tender Dashboard</title>
+  <title>SPSE Inaproc: Dasbor Intelijen Tender</title>
   <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
   <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,6 +21,7 @@
   </script>
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; }
+    :focus-visible { outline: 2px solid #2563eb !important; outline-offset: 2px !important; }
     .scrollbar-thin::-webkit-scrollbar { width: 5px; }
     .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
     .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -35,9 +36,25 @@
     .progress-pulse { animation: progressPulse 1.5s ease-in-out infinite; }
     .progress-bar-fill { transition: width 0.4s ease-in-out; }
 
-    /* Mobile responsive */
+    /* Mobile responsive & Off-canvas Drawer (P2) */
     @media (max-width: 768px) {
-      .sidebar-desktop { display: none !important; }
+      .sidebar-desktop {
+        position: fixed !important;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 50;
+        width: 85vw !important;
+        max-width: 320px !important;
+        height: 100% !important;
+        transform: translateX(-100%);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        display: flex !important;
+      }
+      .sidebar-desktop.mobile-open {
+        transform: translateX(0) !important;
+      }
       .mobile-header { display: flex !important; }
       .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .table-scroll table { min-width: 800px; }
@@ -49,6 +66,7 @@
     }
     @media (min-width: 769px) {
       .mobile-only { display: none !important; }
+      #sidebar-backdrop { display: none !important; }
     }
   </style>
 </head>
@@ -57,158 +75,166 @@
 <div class="flex h-full">
 
   <!-- ===== LEFT SIDEBAR ===== -->
-  <aside class="sidebar-desktop w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
+  <aside id="app-sidebar" role="region" aria-label="Filter Pencarian dan Kategori" class="sidebar-desktop w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 overflow-y-auto scrollbar-thin">
 
     <!-- Logo -->
-    <div class="px-5 py-4 border-b border-slate-200">
+    <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <img src="{% static 'img/logo.png' %}" alt="SPSE Inaproc Logo" class="w-8 h-8 rounded-lg object-contain">
         <div>
           <h1 class="text-sm font-bold text-slate-800 leading-tight">SPSE Inaproc</h1>
-          <p class="text-[10px] text-slate-400 leading-tight">Tender Intelligence Dashboard</p>
+          <p class="text-[11px] text-slate-500 leading-tight">Dasbor Intelijen Tender</p>
         </div>
       </div>
+      <!-- Mobile Close Drawer Button -->
+      <button onclick="toggleMobileSidebar(false)"
+        class="md:hidden p-2 -mr-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors"
+        aria-label="Tutup filter sidebar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
     </div>
 
     <!-- Total Counter -->
     <div class="px-5 py-3 border-b border-slate-200 bg-slate-50">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">Total Paket</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-1">Total Paket</div>
       <div class="text-2xl font-bold text-slate-800" id="total-count-sidebar">0</div>
     </div>
 
     <!-- HPS Range Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Kisaran Nilai HPS</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Kisaran Nilai HPS</div>
       <div class="space-y-1.5" id="hps-filters">
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="" checked class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Semua</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-all">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Semua</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-all">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="gt10m" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">&gt; 10 Miliar</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-gt10m">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">&gt; 10 Miliar</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-gt10m">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="5m_10m" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">5 - 10 Miliar</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-5m_10m">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">5 M &ndash; 10 M</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-5m_10m">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="2m_5m" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">2 - 5 Miliar</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-2m_5m">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">2 M &ndash; 5 M</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-2m_5m">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="1m_2m" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">1 - 2 Miliar</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-1m_2m">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">1 M &ndash; 2 M</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-1m_2m">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="500j_1m" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">500 Jt - 1 Miliar</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-500j_1m">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">500 Jt &ndash; 1 M</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-500j_1m">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="200j_500j" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">200 - 500 Jt</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-200j_500j">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">200 Jt &ndash; 500 Jt</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-200j_500j">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="hps_range" value="lt200j" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">&lt; 200 Juta</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="hps-count-lt200j">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">&lt; 200 Juta</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="hps-count-lt200j">0</span>
         </label>
       </div>
     </div>
 
     <!-- Jenis Pengadaan Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Jenis Pengadaan</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Jenis Pengadaan</div>
       <div class="space-y-1.5" id="jenis-filters">
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="jenis" value="" checked class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Semua</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-all">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Semua</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="jenis-count-all">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="jenis" value="Pekerjaan Konstruksi" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pekerjaan Konstruksi</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-konstruksi">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Pekerjaan Konstruksi</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="jenis-count-konstruksi">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="jenis" value="Jasa Konsultansi" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Jasa Konsultansi</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-konsultansi">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Jasa Konsultansi</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="jenis-count-konsultansi">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="jenis" value="Pengadaan Barang" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pengadaan Barang</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-barang">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Pengadaan Barang</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="jenis-count-barang">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="jenis" value="Jasa Lainnya" class="w-3.5 h-3.5" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Jasa Lainnya</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="jenis-count-lainnya">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Jasa Lainnya</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="jenis-count-lainnya">0</span>
         </label>
       </div>
     </div>
 
     <!-- KBLI / Sub-Bidang Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">KBLI / Sub-Bidang</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">KBLI / Sub-Bidang</div>
       <div class="space-y-1.5" id="kbli-filters">
         {% for code, name in kbli_items %}
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="kbli_code" value="{{ code }}" class="kbli-cb w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1 truncate" title="{{ code }} — {{ name }}">{{ code }} — {{ name|truncatechars:30 }}</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="kbli-count-{{ code }}">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1 truncate" title="{{ code }}: {{ name }}">{{ code }} : {{ name|truncatechars:30 }}</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="kbli-count-{{ code }}">0</span>
         </label>
         {% endfor %}
       </div>
+      {% if user.is_authenticated and user.is_superadmin %}
       <div class="mt-3 pt-3 border-t border-slate-200/50">
-        <button onclick="openKbliModal()" class="w-full text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1.5 transition">
+        <button onclick="openKbliModal()" class="w-full text-[11px] text-slate-600 hover:text-indigo-600 flex items-center gap-1.5 transition font-medium">
           <span>&#9881;</span> Kelola KBLI
         </button>
       </div>
+      {% endif %}
     </div>
 
     <!-- Tahapan / Status Tahap Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Tahapan</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Tahapan</div>
       <div class="space-y-1.5" id="tahapan-filters">
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="tahapan" value="Pra-Kualifikasi" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pra-Kualifikasi</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-prakualifikasi">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Pra-Kualifikasi</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="tahapan-count-prakualifikasi">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="tahapan" value="Pengumuman" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Pengumuman</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-pengumuman">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Pengumuman</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="tahapan-count-pengumuman">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="tahapan" value="Evaluasi" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Evaluasi</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-evaluasi">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Evaluasi</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="tahapan-count-evaluasi">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="tahapan" value="Penawaran" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Penawaran</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-penawaran">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Penawaran</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="tahapan-count-penawaran">0</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="checkbox" name="tahapan" value="Lainnya" class="w-3.5 h-3.5 rounded" onchange="applyFilters()">
-          <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1">Lainnya</span>
-          <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="tahapan-count-lainnya">0</span>
+          <span class="text-xs text-slate-700 group-hover:text-slate-900 flex-1">Lainnya</span>
+          <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="tahapan-count-lainnya">0</span>
         </label>
       </div>
     </div>
 
     <!-- Lokasi Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Lokasi Pekerjaan</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Lokasi Pekerjaan</div>
       <input id="filter-location" type="text" placeholder="Contoh: Jakarta, Bandung..."
         oninput="debouncedApplyFilters()"
         class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -216,15 +242,15 @@
 
     <!-- Deadline Filter -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Deadline</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Batas Waktu</div>
       <div class="space-y-2">
         <div>
-          <label class="text-[9px] text-slate-400">Sebelum</label>
+          <label class="text-[10px] text-slate-500 font-medium">Sebelum</label>
           <input id="filter-deadline-before" type="date" onchange="applyFilters()"
             class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
         <div>
-          <label class="text-[9px] text-slate-400">Setelah</label>
+          <label class="text-[10px] text-slate-500 font-medium">Setelah</label>
           <input id="filter-deadline-after" type="date" onchange="applyFilters()"
             class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
@@ -233,132 +259,45 @@
 
     <!-- HPS Custom Range -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">HPS Custom (Rp)</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">HPS Khusus (Rp)</div>
       <div class="space-y-2">
         <input id="filter-hps-min" type="number" placeholder="Min (contoh: 500000000)" onchange="applyFilters()"
           class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <input id="filter-hps-max" type="number" placeholder="Max (contoh: 10000000000)" onchange="applyFilters()"
+        <input id="filter-hps-max" type="number" placeholder="Maks (contoh: 10000000000)" onchange="applyFilters()"
           class="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
-    </div>
-
-    <!-- Crawl Controls -->
-    <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Sinkronisasi Data</div>
-      <div class="space-y-2">
-        <input id="crawl-instansi" type="text" placeholder="Kode instansi (pisah koma) atau 'all'"
-          class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-        <button onclick="startCrawl()" id="btn-crawl"
-          class="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          <span id="crawl-btn-text">Sync Data Baru</span>
-          <span id="crawl-spinner" class="spinner hidden"></span>
-        </button>
-      </div>
-      <div id="crawl-status" class="mt-2 text-[10px] text-slate-400 hidden"></div>
-    </div>
-
-    <!-- Flush Records -->
-    <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Pembersihan Data</div>
-      <button onclick="openFlushModal()"
-        class="w-full px-3 py-2 text-xs font-semibold rounded-lg border-2 border-red-300 text-red-600 bg-red-50 hover:bg-red-100 hover:border-red-400 active:bg-red-200 transition-colors flex items-center justify-center gap-2">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-        Flush Data Non-Aktif
-      </button>
-      <div class="mt-1.5 text-[10px] text-slate-400 text-center" id="flush-status"></div>
     </div>
 
     <!-- Profil Perusahaan -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Profil Perusahaan</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Profil Perusahaan</div>
       <button onclick="openCompanyModal()"
         class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-colors flex items-center justify-center gap-2">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
         Kelola Profil & Kualifikasi
       </button>
-      <div class="mt-2 text-[10px] text-slate-400" id="company-sidebar-info">Memuat...</div>
-    </div>
-
-    <!-- Monitoring Crawl -->
-    <div class="sidebar-section px-5 py-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Monitoring Crawl</div>
-        <button onclick="toggleMonitorPanel()" id="btn-monitor-toggle"
-          class="text-[10px] text-blue-600 hover:text-blue-800 font-medium">
-          <span id="monitor-toggle-text">Tampilkan</span>
-        </button>
-      </div>
-      <div id="monitor-panel" class="hidden">
-        <!-- Status badge -->
-        <div class="flex items-center gap-2 mb-3">
-          <span id="monitor-status-badge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
-            Idle
-          </span>
-          <span id="monitor-elapsed" class="text-[10px] text-slate-400 font-mono"></span>
-        </div>
-        <!-- Progress bar -->
-        <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
-          <div id="monitor-progress-bar" class="progress-bar-fill bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-        </div>
-        <!-- Counter text -->
-        <div class="text-[11px] text-slate-600 mb-2" id="monitor-counter">Memproses 0 dari 0 paket (0%)</div>
-        <!-- Saved / Skipped / Errors -->
-        <div class="flex items-center gap-3 mb-2 text-[10px]">
-          <span class="text-emerald-600"><span id="monitor-saved">0</span> tersimpan</span>
-          <span class="text-amber-600"><span id="monitor-skipped">0</span> dilewati</span>
-          <span class="text-red-600"><span id="monitor-errors">0</span> error</span>
-        </div>
-        <!-- Instansi progress -->
-        <div class="text-[10px] text-slate-500 mb-2">
-          Instansi: <span id="monitor-instansi-progress">0</span>/<span id="monitor-instansi-total">0</span>
-          — <span id="monitor-current-instansi" class="font-mono text-slate-700">-</span>
-        </div>
-        <!-- ETA -->
-        <div class="text-[10px] text-slate-400 mb-2" id="monitor-eta"></div>
-        <!-- Activity log (last 3) -->
-        <div class="mt-2 border-t border-slate-100 pt-2">
-          <div class="text-[9px] uppercase text-slate-400 font-semibold mb-1">Aktivitas Terkini</div>
-          <div id="monitor-activity-log" class="space-y-1 max-h-16 overflow-y-auto scrollbar-thin">
-            <div class="text-[10px] text-slate-400 italic">Belum ada aktivitas</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Scheduler -->
-    <div class="sidebar-section px-5 py-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Auto Crawl</div>
-          <div class="text-[10px] text-slate-400 mt-0.5">Interval 1 jam</div>
-        </div>
-        <button onclick="toggleScheduler()" id="btn-scheduler"
-          class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {% if scheduler_running %}bg-blue-600{% else %}bg-slate-300{% endif %}">
-          <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform {% if scheduler_running %}translate-x-4{% else %}translate-x-1{% endif %}"></span>
-        </button>
-      </div>
+      <div class="mt-2 text-[11px] text-slate-500" id="company-sidebar-info">Memuat...</div>
     </div>
 
     <!-- Pipeline Summary -->
     <div class="sidebar-section px-5 py-4">
-      <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-3">Pipeline Pengajuan</div>
+      <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-3">Pipeline Pengajuan</div>
       <div id="pipeline-summary" class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="text-[10px] text-slate-500">Belum Diproses</span>
-          <span class="text-[10px] font-semibold text-slate-700" id="pipe-belum">-</span>
+          <span class="text-[11px] text-slate-600">Belum Diproses</span>
+          <span class="text-[11px] font-semibold text-slate-700" id="pipe-belum">-</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-[10px] text-slate-500">Sudah Submit</span>
-          <span class="text-[10px] font-semibold text-emerald-700" id="pipe-submit">-</span>
+          <span class="text-[11px] text-slate-600">Sudah Diajukan</span>
+          <span class="text-[11px] font-semibold text-emerald-700" id="pipe-submit">-</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-[10px] text-slate-500">Menang</span>
-          <span class="text-[10px] font-bold text-emerald-600" id="pipe-menang">-</span>
+          <span class="text-[11px] text-slate-600">Menang</span>
+          <span class="text-[11px] font-bold text-emerald-600" id="pipe-menang">-</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-[10px] text-slate-500">Gagal</span>
-          <span class="text-[10px] font-semibold text-red-600" id="pipe-gagal">-</span>
+          <span class="text-[11px] text-slate-600">Gagal</span>
+          <span class="text-[11px] font-semibold text-red-600" id="pipe-gagal">-</span>
         </div>
       </div>
       <div id="pipe-urgency" class="hidden mt-2 pt-2 border-t border-slate-100 text-[9px] text-center"></div>
@@ -367,87 +306,197 @@
     <!-- Watchlist -->
     <div class="sidebar-section px-5 py-4">
       <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Watchlist</div>
-        <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="watchlist-count">0</span>
+        <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold">Watchlist</div>
+        <span class="text-[11px] text-slate-600 font-mono tabular-nums" id="watchlist-count">0</span>
       </div>
       <div id="watchlist-list" class="space-y-1.5 max-h-40 overflow-y-auto scrollbar-thin">
-        <div class="text-[10px] text-slate-400 italic">Memuat...</div>
+        <div class="text-[11px] text-slate-500 italic">Memuat...</div>
       </div>
     </div>
 
-    <!-- Report Summary (Admin/Superadmin only) -->
-    <div class="sidebar-section px-5 py-4">
-      <a href="/reports/" class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors flex items-center justify-center gap-2">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        Report Summary
-      </a>
+    <!-- ================================================================= -->
+    <!-- PANEL OPERASIONAL (SUPERADMIN ONLY)                               -->
+    <!-- ================================================================= -->
+    {% if user.is_authenticated and user.is_superadmin %}
+    <div class="mt-4 border-t-2 border-slate-200 bg-slate-50/60 pb-4">
+      <div class="px-5 py-2.5 bg-slate-100/80 border-b border-slate-200/80 text-[10px] uppercase tracking-wider font-bold text-slate-700 flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span>Kontrol Operasional</span>
+      </div>
+
+      <!-- Sinkronisasi Data -->
+      <div class="sidebar-section px-5 py-3 border-b border-slate-100">
+        <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-2">Sinkronisasi Data</div>
+        <div class="space-y-2">
+          <input id="crawl-instansi" type="text" placeholder="Kode instansi (pisah koma) atau 'all'"
+            class="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <button onclick="startCrawl()" id="btn-crawl"
+            class="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span id="crawl-btn-text">Perbarui Data</span>
+            <span id="crawl-spinner" class="spinner hidden"></span>
+          </button>
+        </div>
+        <div id="crawl-status" class="mt-2 text-[10px] text-slate-500 hidden"></div>
+      </div>
+
+      <!-- Auto Crawl (Scheduler) -->
+      <div class="sidebar-section px-5 py-3 border-b border-slate-100">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold">Sinkronisasi Otomatis</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Interval 1 jam</div>
+          </div>
+          <button onclick="toggleScheduler()" id="btn-scheduler"
+            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {% if scheduler_running %}bg-blue-600{% else %}bg-slate-300{% endif %}">
+            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform {% if scheduler_running %}translate-x-4{% else %}translate-x-1{% endif %}"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Monitoring Crawl -->
+      <div class="sidebar-section px-5 py-3 border-b border-slate-100">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold">Pemantauan Sinkronisasi</div>
+          <button onclick="toggleMonitorPanel()" id="btn-monitor-toggle"
+            class="text-[10px] text-blue-600 hover:text-blue-800 font-medium">
+            <span id="monitor-toggle-text">Tampilkan</span>
+          </button>
+        </div>
+        <div id="monitor-panel" class="hidden">
+          <!-- Status badge -->
+          <div class="flex items-center gap-2 mb-3">
+            <span id="monitor-status-badge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">
+              Menunggu
+            </span>
+            <span id="monitor-elapsed" class="text-[10px] text-slate-500 font-mono"></span>
+          </div>
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
+            <div id="monitor-progress-bar" class="progress-bar-fill bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+          </div>
+          <!-- Counter text -->
+          <div class="text-[11px] text-slate-600 mb-2" id="monitor-counter">Memproses 0 dari 0 paket (0%)</div>
+          <!-- Saved / Skipped / Errors -->
+          <div class="flex items-center gap-3 mb-2 text-[10px]">
+            <span class="text-emerald-600"><span id="monitor-saved">0</span> tersimpan</span>
+            <span class="text-amber-600"><span id="monitor-skipped">0</span> dilewati</span>
+            <span class="text-red-600"><span id="monitor-errors">0</span> error</span>
+          </div>
+          <!-- Instansi progress -->
+          <div class="text-[10px] text-slate-500 mb-2">
+            Instansi: <span id="monitor-instansi-progress">0</span>/<span id="monitor-instansi-total">0</span>
+            : <span id="monitor-current-instansi" class="font-mono text-slate-700">-</span>
+          </div>
+          <!-- ETA -->
+          <div class="text-[10px] text-slate-500 mb-2" id="monitor-eta"></div>
+          <!-- Activity log (last 3) -->
+          <div class="mt-2 border-t border-slate-200/60 pt-2">
+            <div class="text-[9px] uppercase text-slate-500 font-semibold mb-1">Aktivitas Terkini</div>
+            <div id="monitor-activity-log" class="space-y-1 max-h-16 overflow-y-auto scrollbar-thin">
+              <div class="text-[10px] text-slate-500 italic">Belum ada aktivitas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pembersihan Data (Flush) -->
+      <div class="sidebar-section px-5 py-3 border-b border-slate-100">
+        <div class="text-[11px] uppercase tracking-wider text-slate-600 font-bold mb-2">Pembersihan Bank Data</div>
+        <button onclick="openFlushModal()"
+          class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-red-200 text-red-600 bg-red-50/70 hover:bg-red-100 hover:border-red-300 active:bg-red-200 transition-colors flex items-center justify-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Bersihkan Data Non-Aktif (Flush Data Non-Aktif)
+        </button>
+        <div class="mt-1.5 text-[10px] text-slate-500 text-center" id="flush-status"></div>
+      </div>
+
+      <!-- Report Summary (Admin/Superadmin only) -->
+      <div class="sidebar-section px-5 py-3">
+        <a href="/reports/" class="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors flex items-center justify-center gap-2">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Ringkasan Laporan
+        </a>
+      </div>
     </div>
+    {% endif %}
 
   </aside>
+
+  <!-- Mobile Sidebar Backdrop -->
+  <div id="sidebar-backdrop" onclick="toggleMobileSidebar(false)"
+    class="hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity"></div>
 
   <!-- ===== MAIN CONTENT ===== -->
   <div class="flex-1 flex flex-col overflow-hidden">
 
     <!-- Top Navigation Bar -->
-    <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-3 flex-shrink-0">
-      <div class="flex items-center justify-between gap-4">
-        <!-- Mobile hamburger -->
-        <button onclick="toggleMobileSidebar()" class="mobile-only p-2 text-slate-500 hover:text-slate-700">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-2.5 flex-shrink-0">
+      <div class="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
+        <!-- Mobile Filter Button (Tap target >= 44px) -->
+        <button id="mobile-filter-btn" onclick="toggleMobileSidebar(true)"
+          class="md:hidden inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg min-h-[44px] min-w-[44px] justify-center transition-colors flex-shrink-0"
+          aria-label="Buka Filter dan Kategori Tender"
+          aria-expanded="false"
+          aria-controls="app-sidebar">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+          <span>Filter</span>
         </button>
 
-        <!-- Status Tabs -->
-        <nav class="flex items-center gap-1 -mb-px">
-          <button onclick="setStatus('')" data-tab="all"
-            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors tab-active">
+        <!-- Status Tabs (Horizontally scrollable on mobile, min-h 44px) -->
+        <nav class="flex items-center gap-1 -mb-px overflow-x-auto scrollbar-none flex-nowrap py-1" role="tablist" aria-label="Filter Status Tender">
+          <button onclick="setStatus('')" data-tab="all" role="tab" aria-selected="true"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors tab-active min-h-[44px] flex items-center whitespace-nowrap">
             Semua
           </button>
-          <button onclick="setStatus('aktif')" data-tab="aktif"
-            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+          <button onclick="setStatus('aktif')" data-tab="aktif" role="tab" aria-selected="false"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors min-h-[44px] flex items-center whitespace-nowrap">
             Aktif
-            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold" id="tab-count-aktif">0</span>
+            <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold" id="tab-count-aktif">0</span>
           </button>
-          <button onclick="setStatus('prakualifikasi')" data-tab="prakualifikasi"
-            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+          <button onclick="setStatus('prakualifikasi')" data-tab="prakualifikasi" role="tab" aria-selected="false"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors min-h-[44px] flex items-center whitespace-nowrap">
             Prakualifikasi
-            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold" id="tab-count-prakualifikasi">0</span>
+            <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold" id="tab-count-prakualifikasi">0</span>
           </button>
-          <button onclick="setStatus('it_priority')" data-tab="it_priority"
-            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+          <button onclick="setStatus('it_priority')" data-tab="it_priority" role="tab" aria-selected="false"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors min-h-[44px] flex items-center whitespace-nowrap">
             Prioritas IT
-            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold" id="tab-count-it-priority">0</span>
+            <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold" id="tab-count-it-priority">0</span>
           </button>
-          <button onclick="setStatus('recommended')" data-tab="recommended"
-            class="status-tab px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">
+          <button onclick="setStatus('recommended')" data-tab="recommended" role="tab" aria-selected="false"
+            class="status-tab px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors min-h-[44px] flex items-center whitespace-nowrap">
             Rekomendasi
-            <span class="ml-1 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-sky-100 text-sky-700 text-[10px] font-semibold" id="tab-count-recommended">0</span>
+            <span class="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-sky-100 text-sky-700 text-[10px] font-semibold" id="tab-count-recommended">0</span>
           </button>
         </nav>
 
         <!-- Search + Pagination Controls -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 top-nav-controls">
           <!-- Search -->
           <div class="relative">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input id="global-search" type="text" placeholder="Cari nama paket / kode / instansi..."
+            <input id="global-search" type="text" placeholder="Cari nama paket, kode lelang, atau instansi..."
+              aria-label="Cari paket tender, kode lelang, atau instansi"
               oninput="debouncedApplyFilters()"
               class="w-72 pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
           </div>
           <!-- Page Size -->
           <select id="page-size" onchange="applyFilters()"
-            class="px-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            aria-label="Jumlah baris per halaman"
+            class="px-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="10">10 baris</option>
             <option value="25" selected>25 baris</option>
             <option value="50">50 baris</option>
           </select>
           <!-- Download -->
           <a id="dl-csv" href="/api/download/csv/" onclick="return appendFilterDownload(this)"
-            class="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+            class="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
             <svg class="w-3.5 h-3.5 inline-block -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             CSV
           </a>
           <a id="dl-excel" href="/api/download/excel/" onclick="return appendFilterDownload(this)"
-            class="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+            class="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
             <svg class="w-3.5 h-3.5 inline-block -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             Excel
           </a>
@@ -459,11 +508,11 @@
             </div>
             <div class="text-[10px] leading-tight">
               <div class="font-semibold text-slate-700">{{ user.get_full_name|default:user.username }}</div>
-              <div class="text-slate-400">{{ user.get_role_display }}</div>
+              <div class="text-slate-500">{{ user.get_role_display }}</div>
             </div>
             <form method="POST" action="{% url 'accounts:logout' %}" class="inline">
               {% csrf_token %}
-              <button type="submit" title="Logout" class="ml-1 p-1 text-slate-400 hover:text-red-500 transition-colors">
+              <button type="submit" title="Logout" aria-label="Keluar dari akun" class="ml-1 p-1 text-slate-500 hover:text-red-500 transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
               </button>
             </form>
@@ -477,29 +526,57 @@
       </div>
     </header>
 
-    <!-- Results Info Bar -->
-    <div class="bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
-      <div class="text-xs text-slate-500">
-        Menampilkan <span class="font-semibold text-slate-700" id="showing-start">0</span>-<span class="font-semibold text-slate-700" id="showing-end">0</span> dari <span class="font-semibold text-slate-700" id="showing-total">0</span> tender
-      </div>
-      <div class="flex items-center gap-1">
-        <button onclick="goPage(-1)" id="btn-prev"
-          class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-          &laquo; Prev
-        </button>
-        <span class="text-xs text-slate-500 px-2 font-mono" id="page-indicator">1 / 1</span>
-        <button onclick="goPage(1)" id="btn-next"
-          class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-          Next &raquo;
-        </button>
+    <!-- ===== PROFILE COMPLETION BANNER (UX-006) ===== -->
+    <div id="company-completion-banner" class="hidden border-b border-slate-200 px-4 md:px-6 py-2.5 flex-shrink-0 transition-colors">
+      <div class="flex flex-wrap md:flex-nowrap items-center justify-between gap-3">
+        <!-- Left: Status, Progress Bar, Guidance -->
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 md:gap-4 flex-1 min-w-0">
+          <!-- Icon + Label -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span id="completion-icon-wrapper" class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
+              <svg id="completion-icon-svg" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-slate-800" id="completion-title">Profil Perusahaan</span>
+              <span id="completion-badge" class="px-1.5 py-0.5 rounded text-[11px] font-bold font-mono bg-blue-100 text-blue-700">0%</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-24 sm:w-32 md:w-44 bg-slate-200 h-2 rounded-full overflow-hidden flex-shrink-0">
+            <div id="completion-bar-fill" class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+
+          <!-- Guidance / Detail Text -->
+          <div class="text-[11px] text-slate-600 truncate flex-1 min-w-0" id="completion-guidance">
+            Memuat status kelengkapan profil...
+          </div>
+        </div>
+
+        <!-- Right: Action CTA -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button id="completion-cta-btn" onclick="openCompanyModal()"
+            class="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            <span id="completion-cta-text">Lengkapi Profil</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- TENDER RADAR -->
+    <!-- ===== PERLU PERHATIAN (UX-007) ===== -->
+    <div id="attention-block" class="hidden bg-white border-b border-slate-100 px-6 py-2.5 flex-shrink-0">
+      <div class="flex items-center gap-4 flex-wrap">
+        <span class="text-xs font-bold text-slate-700 uppercase tracking-wider flex-shrink-0">Perlu Perhatian</span>
+        <div id="attention-items" class="flex items-center gap-3 flex-wrap"></div>
+      </div>
+    </div>
+
+    <!-- ===== TENDER RADAR (UX-007: dipindah ke atas, expanded default) ===== -->
     <div id="radar-section" class="bg-white border-b border-slate-100 flex-shrink-0">
       <button type="button" onclick="toggleRadar()" class="w-full flex items-center justify-between px-6 py-2.5 hover:bg-slate-50 transition-colors">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-bold text-indigo-700 uppercase tracking-wider">Tender Radar</span>
+          <span class="text-xs font-bold text-indigo-700 uppercase tracking-wider">Rekomendasi untuk Anda</span>
           <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold" id="radar-count">0</span>
           <span class="text-[10px] text-slate-400" id="radar-subtitle">Peluang cocok untuk perusahaan Anda</span>
         </div>
@@ -512,64 +589,114 @@
           <button onclick="loadRadar('LAYAK_DIKEJAR')" data-rf="LAYAK_DIKEJAR" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50">Layak</button>
           <button onclick="loadRadar('REVIEW')" data-rf="REVIEW" class="radar-filter px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors border-slate-200 text-slate-600 hover:bg-slate-50">Perlu Ditinjau</button>
         </div>
-        <div id="radar-loading" class="text-[11px] text-slate-400 italic py-4">Memuat radar tender...</div>
+        <div id="radar-loading" class="hidden space-y-2 py-1">
+          <div class="border border-slate-100 rounded-lg p-3 animate-pulse"><div class="h-3 bg-slate-100 rounded w-2/3 mb-2"></div><div class="h-2.5 bg-slate-100 rounded w-1/3"></div></div>
+          <div class="border border-slate-100 rounded-lg p-3 animate-pulse"><div class="h-3 bg-slate-100 rounded w-1/2 mb-2"></div><div class="h-2.5 bg-slate-100 rounded w-1/4"></div></div>
+        </div>
         <div id="radar-results" class="space-y-2"></div>
+        <div id="radar-more" class="hidden pt-2">
+          <button onclick="loadRadar(radarState.active, 15)" class="w-full py-1.5 text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition-colors">Lihat semua peluang</button>
+        </div>
       </div>
     </div>
 
     <!-- INTELLIGENCE READINESS STATUS -->
     <div class="bg-white border-b border-slate-100 px-6 py-1.5 flex items-center gap-3 flex-shrink-0 flex-wrap">
-      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">AI Analysis</span>
-      <span id="intel-readiness-chip" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-slate-50 text-slate-500 border-slate-200">Memuat...</span>
-      <span class="text-[10px] text-slate-500">AI Match <span class="font-semibold text-slate-800" id="intel-ai-pct">0%</span> · Skor Peluang <span class="font-semibold text-slate-800" id="intel-opp-pct">0%</span></span>
-      <span class="text-[10px]" id="intel-ready-text"></span>
+      <span class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Analisis AI</span>
+      <span id="intel-readiness-chip" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-slate-50 text-slate-600 border-slate-200">Memuat...</span>
+      <span class="text-[10px] text-slate-600">Kecocokan AI <span class="font-semibold text-slate-800" id="intel-ai-pct">0%</span> · Skor Peluang <span class="font-semibold text-slate-800" id="intel-opp-pct">0%</span></span>
+      <span class="text-[10px] text-slate-600" id="intel-ready-text"></span>
     </div>
 
-    <!-- Main Table -->
+    <!-- ===== CARI TENDER: zona pencarian lengkap ===== -->
+    <div class="bg-slate-50 border-b border-slate-200 px-6 pt-3 pb-1 flex-shrink-0">
+      <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Cari Tender</span>
+      <span class="text-[11px] text-slate-500 ml-2">Semua data tender dengan filter lengkap di panel kiri</span>
+    </div>
+
+    <!-- Results Info Bar -->
+    <div class="bg-white border-b border-slate-100 px-4 md:px-6 py-2 flex items-center justify-between flex-shrink-0">
+      <div class="text-xs text-slate-600">
+        Menampilkan <span class="font-semibold text-slate-800" id="showing-start">0</span>-<span class="font-semibold text-slate-800" id="showing-end">0</span> dari <span class="font-semibold text-slate-800" id="showing-total">0</span> tender
+      </div>
+      <div class="flex items-center gap-1.5 pagination-controls">
+        <button onclick="goPage(-1)" id="btn-prev"
+          class="min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+          aria-label="Halaman sebelumnya">
+          &laquo; Prev
+        </button>
+        <span class="text-xs text-slate-600 px-2 font-mono font-medium" id="page-indicator">1 / 1</span>
+        <button onclick="goPage(1)" id="btn-next"
+          class="min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+          aria-label="Halaman berikutnya">
+          Next &raquo;
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Table & Mobile Cards View -->
     <div class="flex-1 overflow-auto bg-slate-50">
-      <div class="table-scroll">
+      <!-- Desktop Table View -->
+      <div class="table-scroll hidden md:block">
       <table class="w-full text-xs">
         <thead class="bg-white sticky top-0 z-10 border-b border-slate-200">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-24">Kode Paket</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[260px]">Nama Paket & Jenis</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[180px]">K/L/PD Instansi</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider min-w-[140px]">Tahapan</th>
-            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-16" title="Skor Prioritas IT">Skor IT</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider w-28">Tgl Dibuat</th>
-            <th class="px-4 py-3 text-right font-semibold text-slate-500 uppercase tracking-wider w-24">HPS</th>
-            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-20" title="Tingkat Kecocokan Kualifikasi">Kecocokan</th>
-            <th class="px-4 py-3 text-center font-semibold text-slate-500 uppercase tracking-wider w-20" title="Aksi">Aksi</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-700 uppercase tracking-wider w-24">Kode Paket</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-700 uppercase tracking-wider min-w-[260px]">Nama Paket & Jenis</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-700 uppercase tracking-wider min-w-[180px]">K/L/PD Instansi</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-700 uppercase tracking-wider min-w-[140px]">Tahapan</th>
+            <th class="px-4 py-3 text-center font-bold text-slate-700 uppercase tracking-wider w-16" title="Skor Prioritas IT">Skor IT</th>
+            <th class="px-4 py-3 text-left font-bold text-slate-700 uppercase tracking-wider w-28">Tgl Dibuat</th>
+            <th class="px-4 py-3 text-right font-bold text-slate-700 uppercase tracking-wider w-24">HPS</th>
+            <th class="px-4 py-3 text-center font-bold text-slate-700 uppercase tracking-wider w-20" title="Tingkat Kecocokan Kualifikasi">Kecocokan</th>
+            <th class="px-4 py-3 text-center font-bold text-slate-700 uppercase tracking-wider w-20" title="Status Pengajuan">Status</th>
+            <th class="px-4 py-3 text-center font-bold text-slate-700 uppercase tracking-wider w-20" title="Aksi">Aksi</th>
           </tr>
         </thead>
         <tbody id="results-body" class="divide-y divide-slate-100 bg-white">
-          <tr><td colspan="9" class="px-4 py-16 text-center text-slate-400">
+          <tr><td colspan="10" class="px-4 py-16 text-center text-slate-500">
             <div class="flex flex-col items-center gap-2">
-              <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               <span>Memuat data tender...</span>
             </div>
           </td></tr>
         </tbody>
       </table>
       </div>
+
+      <!-- Mobile Cards View (md:hidden) -->
+      <div id="results-cards-mobile" class="md:hidden p-3 space-y-3">
+        <div class="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
+          <div class="flex flex-col items-center gap-2">
+            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span class="text-xs">Memuat data tender...</span>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
 </div>
 
+{% if user.is_authenticated and user.is_superadmin %}
 <!-- Flush Modal -->
-<div id="flush-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="flush-modal" role="dialog" aria-modal="true" aria-labelledby="flush-modal-title" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
   <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md mx-4 overflow-hidden">
     <!-- Header -->
     <div class="px-6 py-4 border-b border-slate-100 bg-red-50">
-      <div class="flex items-center gap-3">
-        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-          <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </div>
+          <div>
+            <h3 id="flush-modal-title" class="text-sm font-bold text-slate-800">Pembersihan Bank Data</h3>
+            <p class="text-[11px] text-slate-600 mt-0.5">Pilih mode penghapusan yang diinginkan</p>
+          </div>
         </div>
-        <div>
-          <h3 class="text-sm font-bold text-slate-800">Pembersihan Bank Data</h3>
-          <p class="text-[11px] text-slate-500 mt-0.5">Pilih mode penghapusan yang diinginkan</p>
-        </div>
+        <button onclick="closeFlushModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-lg hover:bg-red-100/50 transition-colors" aria-label="Tutup dialog pembersihan">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
       </div>
     </div>
     <!-- Body -->
@@ -580,7 +707,7 @@
         <div class="flex items-center justify-between">
           <div>
             <div class="text-xs font-bold text-emerald-800">Hapus Data Non-Prakualifikasi</div>
-            <div class="text-[10px] text-emerald-600 mt-0.5">Rekomendasi — hapus paket yang sudah tidak aktif</div>
+            <div class="text-[10px] text-emerald-700 mt-0.5">Rekomendasi: hapus paket yang sudah tidak aktif</div>
           </div>
           <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-200 px-2 py-0.5 rounded-full">AMAN</span>
         </div>
@@ -591,7 +718,7 @@
         <div class="flex items-center justify-between">
           <div>
             <div class="text-xs font-bold text-amber-800">Hapus Semua Data Inaktif</div>
-            <div class="text-[10px] text-amber-600 mt-0.5">Hapus Selesai, Dikontrak, Batal, Gagal</div>
+            <div class="text-[10px] text-amber-700 mt-0.5">Hapus Selesai, Dikontrak, Batal, Gagal</div>
           </div>
           <span class="text-[10px] font-semibold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">MODERATE</span>
         </div>
@@ -602,7 +729,7 @@
         <div class="flex items-center justify-between">
           <div>
             <div class="text-xs font-bold text-red-800">Hapus SEMUA Data (Reset Total)</div>
-            <div class="text-[10px] text-red-600 mt-0.5">Reset seluruh bank data — memerlukan konfirmasi</div>
+            <div class="text-[10px] text-red-700 mt-0.5">Reset seluruh bank data (memerlukan konfirmasi)</div>
           </div>
           <span class="text-[10px] font-semibold text-red-700 bg-red-200 px-2 py-0.5 rounded-full">BAHAYA</span>
         </div>
@@ -619,20 +746,20 @@
 </div>
 
 <!-- KBLI CRUD Modal -->
-<div id="kbli-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="kbli-modal" role="dialog" aria-modal="true" aria-labelledby="kbli-modal-title" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
   <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg mx-4 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-100 bg-indigo-50">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-slate-800">Manajemen KBLI Master</h3>
-            <p class="text-[11px] text-slate-500 mt-0.5">Tambah, edit, atau hapus kode KBLI</p>
+            <h3 id="kbli-modal-title" class="text-sm font-bold text-slate-800">Manajemen KBLI Master</h3>
+            <p class="text-[11px] text-slate-600 mt-0.5">Tambah, edit, atau hapus kode KBLI</p>
           </div>
         </div>
-        <button onclick="closeKbliModal()" class="text-slate-400 hover:text-slate-600">
+        <button onclick="closeKbliModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-indigo-100/50 transition-colors" aria-label="Tutup dialog KBLI">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
@@ -649,16 +776,17 @@
     </div>
     <!-- List -->
     <div id="kbli-list" class="max-h-72 overflow-y-auto px-6 py-3 space-y-1.5">
-      <div class="text-xs text-slate-400 text-center py-4">Memuat data...</div>
+      <div class="text-xs text-slate-500 text-center py-4">Memuat data...</div>
     </div>
     <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
       <button onclick="closeKbliModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- ===== COMPANY PROFILE MODAL ===== -->
-<div id="company-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+<div id="company-modal" role="dialog" aria-modal="true" aria-labelledby="company-modal-title" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
   <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
     <!-- Header -->
     <div class="px-6 py-4 border-b border-slate-100 bg-blue-50 flex-shrink-0">
@@ -668,20 +796,20 @@
             <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-slate-800">Profil Perusahaan & Kualifikasi</h3>
-            <p class="text-[11px] text-slate-500 mt-0.5" id="company-modal-subtitle">Kelola data profil dan kualifikasi perusahaan</p>
+            <h3 id="company-modal-title" class="text-sm font-bold text-slate-800">Profil Perusahaan & Kualifikasi</h3>
+            <p class="text-[11px] text-slate-600 mt-0.5" id="company-modal-subtitle">Kelola data profil dan kualifikasi perusahaan</p>
           </div>
         </div>
-        <button onclick="closeCompanyModal()" class="text-slate-400 hover:text-slate-600">
+        <button onclick="closeCompanyModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-blue-100/50 transition-colors" aria-label="Tutup dialog profil perusahaan">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
     </div>
 
     <!-- Tabs -->
-    <div class="px-6 pt-3 border-b border-slate-100 flex gap-1 flex-shrink-0">
-      <button onclick="switchCompanyTab('profile')" id="ctab-profile" class="company-tab px-3 py-2 text-xs font-medium text-blue-700 border-b-2 border-blue-600">Profil</button>
-      <button onclick="switchCompanyTab('quals')" id="ctab-quals" class="company-tab px-3 py-2 text-xs font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700">Kualifikasi</button>
+    <div class="px-6 pt-3 border-b border-slate-100 flex gap-1 flex-shrink-0" role="tablist" aria-label="Tab Profil Perusahaan">
+      <button onclick="switchCompanyTab('profile')" id="ctab-profile" role="tab" aria-selected="true" aria-controls="company-tab-profile" class="company-tab px-3 py-2 text-xs font-medium text-blue-700 border-b-2 border-blue-600">Profil</button>
+      <button onclick="switchCompanyTab('quals')" id="ctab-quals" role="tab" aria-selected="false" aria-controls="company-tab-quals" class="company-tab px-3 py-2 text-xs font-medium text-slate-600 border-b-2 border-transparent hover:text-slate-800">Kualifikasi</button>
     </div>
 
     <!-- Content -->
@@ -691,52 +819,58 @@
         <div id="company-profile-form" class="space-y-3">
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Nama Perusahaan *</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Nama Perusahaan *</label>
               <input id="cp-name" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="PT Nama Perusahaan">
             </div>
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">NIB *</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">NIB *</label>
               <input id="cp-nib" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="Nomor Induk Berusaha">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">NPWP</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">NPWP</label>
               <input id="cp-npwp" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="99.888.777.6-555.000">
             </div>
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Telepon</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Telepon</label>
               <input id="cp-phone" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="021-xxxxxxx">
             </div>
           </div>
           <div>
-            <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Alamat</label>
+            <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Alamat</label>
             <textarea id="cp-address" rows="2" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none resize-none" placeholder="Alamat lengkap"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Email Perusahaan</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Email Perusahaan</label>
               <input id="cp-email" type="email" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="info@company.co.id">
             </div>
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Contact Person</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Contact Person</label>
               <input id="cp-contact" type="text" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="Nama PIC">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Modal Disetor (Rp)</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Modal Disetor (Rp)</label>
               <input id="cp-modal" type="number" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="0">
             </div>
             <div>
-              <label class="block text-[10px] uppercase text-slate-400 font-semibold mb-1">Penghasilan Tahunan (Rp)</label>
+              <label class="block text-[10px] uppercase text-slate-600 font-semibold mb-1">Penghasilan Tahunan (Rp)</label>
               <input id="cp-penghasilan" type="number" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none" placeholder="0">
             </div>
           </div>
         </div>
         <div id="company-profile-empty" class="hidden text-center py-8">
-          <div class="text-slate-400 text-xs mb-3">Belum ada profil perusahaan</div>
-          <button onclick="createCompanyProfile()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Buat Profil Perusahaan</button>
+          <div class="flex flex-col items-center justify-center text-center">
+            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <div class="mt-2">
+              <div class="text-xs font-semibold text-slate-700">Profil Perusahaan Belum Tersedia</div>
+              <div class="text-xs text-slate-600 mt-1 max-w-sm mx-auto leading-relaxed">Perusahaan Anda belum memiliki data profil terdaftar. Lengkapi nama dan NIB untuk mengaktifkan fitur pencocokan AI.</div>
+              <div class="mt-1"><button type="button" onclick="showCompanyProfileForm()" class="mt-3 inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-sm cursor-pointer">Buat Profil Perusahaan</button></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -744,10 +878,10 @@
       <div id="company-tab-quals" class="hidden">
         <!-- Add qualification form -->
         <div id="qual-add-form" class="hidden mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <div class="text-[10px] uppercase text-slate-400 font-semibold mb-2">Tambah Kualifikasi Baru</div>
+          <div class="text-[10px] uppercase text-slate-600 font-semibold mb-2">Tambah Kualifikasi Baru</div>
           <div class="grid grid-cols-2 gap-2 mb-2">
             <div>
-              <label class="block text-[10px] text-slate-500 mb-0.5">Kategori *</label>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Kategori *</label>
               <select id="qf-category" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" onchange="onQualCategoryChange()">
                 <option value="izin_usaha">Izin Usaha / SBU / Sertifikasi</option>
                 <option value="pengalaman_kerja">Pengalaman Kerja</option>
@@ -755,7 +889,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-[10px] text-slate-500 mb-0.5">Status</label>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Status</label>
               <select id="qf-status" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
                 <option value="active">Aktif</option>
                 <option value="expired">Kedaluwarsa</option>
@@ -766,7 +900,7 @@
 
           <!-- Common: Nama -->
           <div class="mb-2">
-            <label class="block text-[10px] text-slate-500 mb-0.5">Nama / Judul *</label>
+            <label class="block text-[10px] text-slate-600 mb-0.5">Nama / Judul *</label>
             <input id="qf-name" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nama izin / proyek / personil">
           </div>
 
@@ -776,11 +910,11 @@
           <div id="qf-fields-izin" class="dyn-fields">
             <div class="grid grid-cols-2 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Nomor Izin/Sertifikat</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Nomor Izin/Sertifikat</label>
                 <input id="qf-number" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="No. izin">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Klasifikasi Usaha</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Klasifikasi Usaha</label>
                 <select id="qf-klasifikasi" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
                   <option value="">—</option>
                   <option value="kecil">Kecil</option>
@@ -791,16 +925,16 @@
             </div>
             <div class="grid grid-cols-2 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Nilai (Rp)</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Nilai (Rp)</label>
                 <input id="qf-value" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="0">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Berlaku Dari</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Berlaku Dari</label>
                 <input id="qf-from" type="date" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
               </div>
             </div>
             <div class="mb-2">
-              <label class="block text-[10px] text-slate-500 mb-0.5">Berlaku Sampai</label>
+              <label class="block text-[10px] text-slate-600 mb-0.5">Berlaku Sampai</label>
               <input id="qf-until" type="date" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
             </div>
           </div>
@@ -809,25 +943,25 @@
           <div id="qf-fields-pengalaman" class="dyn-fields hidden">
             <div class="grid grid-cols-2 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Nama Paket Pekerjaan</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Nama Paket Pekerjaan</label>
                 <input id="qf-project" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Pengembangan Sistem...">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Instansi / Klien</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Instansi / Klien</label>
                 <input id="qf-client" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Kementerian / BUMN">
               </div>
             </div>
             <div class="grid grid-cols-3 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Nilai Kontrak (Rp)</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Nilai Kontrak (Rp)</label>
                 <input id="qf-value" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="0">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Tahun Selesai</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Tahun Selesai</label>
                 <input id="qf-year" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="2024" min="2000" max="2030">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Lokasi</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Lokasi</label>
                 <input id="qf-location" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Jakarta">
               </div>
             </div>
@@ -837,17 +971,17 @@
           <div id="qf-fields-sdm" class="dyn-fields hidden">
             <div class="grid grid-cols-2 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Nama Personil</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Nama Personil</label>
                 <input id="qf-person-name" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Nama lengkap">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Jabatan / Posisi</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Jabatan / Posisi</label>
                 <input id="qf-position" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="Project Manager">
               </div>
             </div>
             <div class="grid grid-cols-3 gap-2 mb-2">
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Pendidikan</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Pendidikan</label>
                 <select id="qf-education" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200">
                   <option value="">—</option>
                   <option value="sma">SMA/SMK</option>
@@ -858,11 +992,11 @@
                 </select>
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Pengalaman (Tahun)</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Pengalaman (Tahun)</label>
                 <input id="qf-exp-years" type="number" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="5" min="0" max="50">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-500 mb-0.5">Sertifikasi / SKK</label>
+                <label class="block text-[10px] text-slate-600 mb-0.5">Sertifikasi / SKK</label>
                 <input id="qf-skk" type="text" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" placeholder="CCNA, PMP...">
               </div>
             </div>
@@ -870,12 +1004,12 @@
 
           <!-- KBLI Multi-Select Tag Input (common to all) -->
           <div class="mb-3">
-            <label class="block text-[10px] text-slate-500 mb-0.5">Kode KBLI (opsional, bisa lebih dari satu)</label>
+            <label class="block text-[10px] text-slate-600 mb-0.5">Kode KBLI (opsional, bisa lebih dari satu)</label>
             <div id="qf-kbli-container" class="flex flex-wrap gap-1 p-1.5 min-h-[32px] bg-white border border-slate-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-200">
               <div id="qf-kbli-tags" class="flex flex-wrap gap-1"></div>
               <input id="qf-kbli-input" type="text" class="flex-1 min-w-[80px] px-1 py-0.5 text-xs outline-none" placeholder="Ketik kode, Enter" onkeydown="handleKbliInput(event)">
             </div>
-            <div class="text-[9px] text-slate-400 mt-0.5">Tekan Enter untuk menambah. Contoh: 62019, 62090</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Tekan Enter untuk menambah. Contoh: 62019, 62090</div>
           </div>
 
           <div class="flex justify-end gap-2">
@@ -885,19 +1019,19 @@
         </div>
 
         <div class="flex items-center justify-between mb-3">
-          <div class="text-[10px] uppercase text-slate-400 font-semibold">Daftar Kualifikasi</div>
+          <div class="text-[10px] uppercase text-slate-600 font-semibold">Daftar Kualifikasi</div>
           <button onclick="showQualForm()" id="btn-add-qual" class="hidden px-2.5 py-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">+ Tambah</button>
         </div>
 
         <div id="qual-list" class="space-y-2">
-          <div class="text-xs text-slate-400 text-center py-6">Memuat data...</div>
+          <div class="text-xs text-slate-500 text-center py-6">Memuat data...</div>
         </div>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
-      <div class="text-[10px] text-slate-400" id="company-modal-status"></div>
+      <div class="text-[10px] text-slate-500" id="company-modal-status"></div>
       <div class="flex gap-2">
         <button onclick="closeCompanyModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
         <button onclick="saveCompanyProfile()" id="btn-save-company" class="hidden px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Simpan Profil</button>
@@ -907,7 +1041,7 @@
 </div>
 
 <!-- ===== TENDER DETAIL MODAL ===== -->
-<div id="tender-detail-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-4 px-2 md:py-8 md:px-4" onclick="closeTenderDetailModal(event)">
+<div id="tender-detail-modal" role="dialog" aria-modal="true" aria-labelledby="tdm-title" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-4 px-2 md:py-8 md:px-4" onclick="closeTenderDetailModal(event)">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
     <!-- Header (Full Width) -->
     <div class="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white flex-shrink-0">
@@ -919,11 +1053,16 @@
             <span id="tdm-badge-submission" class="hidden inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border"></span>
           </div>
           <h2 id="tdm-title" class="text-sm md:text-base font-bold text-slate-800 leading-snug"></h2>
-          <p id="tdm-subtitle" class="text-[11px] text-slate-400 mt-1"></p>
+          <p id="tdm-subtitle" class="text-[11px] text-slate-500 mt-1"></p>
         </div>
-        <div class="text-right flex-shrink-0">
-          <div id="tdm-hps" class="text-sm md:text-base font-bold text-emerald-700"></div>
-          <div id="tdm-kode" class="text-[10px] text-slate-400 mt-0.5 font-mono"></div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="text-right">
+            <div id="tdm-hps" class="text-sm md:text-base font-bold text-emerald-700"></div>
+            <div id="tdm-kode" class="text-[10px] text-slate-500 mt-0.5 font-mono"></div>
+          </div>
+          <button onclick="closeTenderDetailModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors ml-1" aria-label="Tutup detail tender">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -936,14 +1075,14 @@
           <div>
             <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Informasi Umum</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              <div><span class="text-slate-400">Instansi:</span> <span id="tdm-instansi" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Satuan Kerja:</span> <span id="tdm-satker" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Jenis Pengadaan:</span> <span id="tdm-jenis" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Metode:</span> <span id="tdm-metode" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Lokasi:</span> <span id="tdm-lokasi" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Tahun Anggaran:</span> <span id="tdm-tahun" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">KBLI:</span> <span id="tdm-kbli" class="text-slate-700 font-medium"></span></div>
-              <div><span class="text-slate-400">Peserta:</span> <span id="tdm-peserta" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Instansi:</span> <span id="tdm-instansi" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Satuan Kerja:</span> <span id="tdm-satker" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Jenis Pengadaan:</span> <span id="tdm-jenis" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Metode:</span> <span id="tdm-metode" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Lokasi:</span> <span id="tdm-lokasi" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Tahun Anggaran:</span> <span id="tdm-tahun" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">KBLI:</span> <span id="tdm-kbli" class="text-slate-700 font-medium"></span></div>
+              <div><span class="text-slate-600 font-medium">Peserta:</span> <span id="tdm-peserta" class="text-slate-700 font-medium"></span></div>
             </div>
           </div>
           <!-- Jadwal Tahapan -->
@@ -951,7 +1090,7 @@
             <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Jadwal Tahapan</h3>
             <div id="tdm-jadwal" class="overflow-x-auto">
               <table class="w-full text-[11px] border border-slate-200 rounded-lg overflow-hidden">
-                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                <thead class="bg-slate-50 text-slate-700 font-bold">
                   <tr><th class="px-3 py-1.5 text-left">#</th><th class="px-3 py-1.5 text-left">Tahap</th><th class="px-3 py-1.5 text-left">Mulai</th><th class="px-3 py-1.5 text-left">Sampai</th><th class="px-3 py-1.5 text-left">Perubahan</th></tr>
                 </thead>
                 <tbody id="tdm-jadwal-body" class="divide-y divide-slate-100"></tbody>
@@ -968,23 +1107,23 @@
           </div>
           <!-- AI / Tingkat Kecocokan -->
           <div id="tdm-ai-section">
-            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Kecocokan Kualitas <span class="text-[9px] font-normal text-slate-400">(AI Fit)</span></h3>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Kecocokan Kualifikasi <span class="text-[9px] font-normal text-slate-500">(Analisis AI)</span></h3>
             <div id="tdm-ai-content" class="bg-slate-50 rounded-lg p-3">
-              <div class="text-[11px] text-slate-400 italic">Klik tombol Analisis untuk melihat skor kecocokan</div>
+              <div class="text-[11px] text-slate-500 italic">Klik tombol Analisis untuk melihat skor kecocokan</div>
             </div>
           </div>
           <!-- Opportunity Score -->
           <div id="tdm-opportunity-section">
-            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Skor Peluang <span class="text-[9px] font-normal text-slate-400">(Prioritas Tender)</span></h3>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Skor Peluang <span class="text-[9px] font-normal text-slate-500">(Prioritas Tender)</span></h3>
             <div id="tdm-opportunity-content" class="bg-slate-50 rounded-lg p-3">
-              <div class="text-[11px] text-slate-400 italic">Memuat...</div>
+              <div class="text-[11px] text-slate-500 italic">Memuat...</div>
             </div>
           </div>
           <!-- Competitive Intelligence -->
           <div>
-            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Competitive Intelligence</h3>
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Intelijen Kompetisi</h3>
             <div id="tdm-competition-content" class="bg-slate-50 rounded-lg p-3">
-              <div class="text-[11px] text-slate-400 italic">Memuat...</div>
+              <div class="text-[11px] text-slate-500 italic">Memuat...</div>
             </div>
           </div>
           <!-- Submitter Workflow -->
@@ -1029,6 +1168,145 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ===== REUSABLE EMPTY STATE RENDERER (UX-004) ===== */
+function renderEmptyState({ icon, title, reason, ctaLabel, ctaAction, colspan, compact }) {
+  let iconHtml = '';
+  if (typeof icon === 'string' && icon.trim().startsWith('<')) {
+    iconHtml = icon;
+  } else {
+    const iconClass = compact ? 'w-5 h-5 text-slate-300 mx-auto' : 'w-8 h-8 text-slate-300 mx-auto';
+    const icons = {
+      search: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>`,
+      sparkles: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>`,
+      radar: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8zm0-14a6 6 0 106 6 6 6 0 00-6-6zm0 10a4 4 0 114-4 4 4 0 01-4 4z"/></svg>`,
+      bookmark: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>`,
+      document: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+      building: `<svg class="${iconClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>`,
+    };
+    iconHtml = icons[icon] || icons.document;
+  }
+
+  const titleHtml = title
+    ? `<div class="${compact ? 'text-[11px] font-semibold text-slate-700' : 'text-xs font-semibold text-slate-700'}">${esc(title)}</div>`
+    : '';
+
+  const reasonHtml = reason
+    ? `<div class="${compact ? 'text-[10px] text-slate-400 mt-0.5' : 'text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed'}">${esc(reason)}</div>`
+    : '';
+
+  let ctaHtml = '';
+  if (ctaLabel && ctaAction) {
+    const btnClass = compact
+      ? 'mt-2 inline-flex items-center px-2 py-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer'
+      : 'mt-3 inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors shadow-sm cursor-pointer';
+    ctaHtml = `<div class="mt-1"><button type="button" onclick="${esc(ctaAction)}" class="${btnClass}">${esc(ctaLabel)}</button></div>`;
+  }
+
+  const padClass = compact ? 'py-3 px-2' : (colspan ? 'py-16 px-4' : 'py-8 px-4');
+  const content = `
+    <div class="flex flex-col items-center justify-center text-center">
+      ${iconHtml}
+      <div class="${compact ? 'mt-1.5' : 'mt-2'}">
+        ${titleHtml}
+        ${reasonHtml}
+        ${ctaHtml}
+      </div>
+    </div>`;
+
+  if (colspan) {
+    return `<tr><td colspan="${colspan}" class="${padClass} text-center">${content}</td></tr>`;
+  }
+  return `<div class="${padClass} text-center">${content}</div>`;
+}
+
+function resetFilters() {
+  document.querySelectorAll('input[name="hps_range"]').forEach(el => el.checked = el.value === '');
+  document.querySelectorAll('input[name="jenis"]').forEach(el => el.checked = el.value === '');
+  document.querySelectorAll('input[name="kbli_code"]:checked').forEach(el => el.checked = false);
+  document.querySelectorAll('input[name="tahapan"]:checked').forEach(el => el.checked = false);
+  const search = document.getElementById('global-search'); if (search) search.value = '';
+  const loc = document.getElementById('filter-location'); if (loc) loc.value = '';
+  const db = document.getElementById('filter-deadline-before'); if (db) db.value = '';
+  const da = document.getElementById('filter-deadline-after'); if (da) da.value = '';
+  const hmin = document.getElementById('filter-hps-min'); if (hmin) hmin.value = '';
+  const hmax = document.getElementById('filter-hps-max'); if (hmax) hmax.value = '';
+  applyFilters();
+}
+
+function navigateToTenders() {
+  setStatus('');
+  const searchInput = document.getElementById('global-search');
+  if (searchInput) searchInput.focus();
+  const table = document.getElementById('results-body');
+  if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showCompanyProfileForm() {
+  document.getElementById('company-profile-form').classList.remove('hidden');
+  document.getElementById('company-profile-empty').classList.add('hidden');
+  document.getElementById('btn-save-company').classList.remove('hidden');
+  const nameInput = document.getElementById('cp-name');
+  if (nameInput) nameInput.focus();
+}
+
+/* ===== GLOBAL API FETCH (UX-003: 401/403/network handling) ===== */
+const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
+const IS_SUPERADMIN = {% if user.is_authenticated and user.is_superadmin %}true{% else %}false{% endif %};
+let _sessionExpired = false;
+let _lastToastAt = 0;
+
+function showToast(message, type) {
+  // Throttle identical bursts from polling loops
+  const now = Date.now();
+  if (now - _lastToastAt < 4000) return;
+  _lastToastAt = now;
+
+  let holder = document.getElementById('toast-holder');
+  if (!holder) {
+    holder = document.createElement('div');
+    holder.id = 'toast-holder';
+    holder.className = 'fixed bottom-4 right-4 z-[100] flex flex-col gap-2';
+    document.body.appendChild(holder);
+  }
+  const colors = type === 'error'
+    ? 'bg-red-50 border-red-200 text-red-700'
+    : 'bg-amber-50 border-amber-200 text-amber-800';
+  const el = document.createElement('div');
+  el.className = 'px-4 py-2.5 rounded-lg border shadow-lg text-xs font-medium max-w-xs ' + colors;
+  el.textContent = message;
+  holder.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+function _handleSessionExpired() {
+  if (_sessionExpired) return;
+  _sessionExpired = true;
+  showToast('Sesi Anda telah berakhir. Mengalihkan ke halaman login...', 'error');
+  setTimeout(() => {
+    window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+  }, 1500);
+}
+
+async function apiFetch(url, opts) {
+  if (_sessionExpired) {
+    // Stop polling traffic after session expiry
+    return new Response(null, { status: 401, statusText: 'session expired' });
+  }
+  let resp;
+  try {
+    resp = await fetch(url, opts);
+  } catch (e) {
+    showToast('Koneksi ke server gagal. Periksa jaringan Anda.', 'error');
+    throw e;
+  }
+  if (resp.status === 401 && IS_AUTHENTICATED) {
+    _handleSessionExpired();
+  } else if (resp.status === 403) {
+    showToast('Anda tidak memiliki akses untuk tindakan ini.', 'error');
+  }
+  return resp;
+}
+
 /* ===== DEBOUNCE ===== */
 let _debounceTimer;
 function debouncedApplyFilters() {
@@ -1043,8 +1321,12 @@ function setStatus(status) {
 
   document.querySelectorAll('.status-tab').forEach(tab => {
     tab.classList.remove('tab-active');
-    if (tab.dataset.tab === status || (status === '' && tab.dataset.tab === 'all')) {
+    const isActive = tab.dataset.tab === status || (status === '' && tab.dataset.tab === 'all');
+    if (isActive) {
       tab.classList.add('tab-active');
+      tab.setAttribute('aria-selected', 'true');
+    } else {
+      tab.setAttribute('aria-selected', 'false');
     }
   });
 
@@ -1109,7 +1391,7 @@ async function applyFilters() {
 async function fetchResults() {
   const params = buildParams();
   try {
-    const resp = await fetch(`/api/results/?${params}`);
+    const resp = await apiFetch(`/api/results/?${params}`);
     const data = await resp.json();
 
     state.totalResults = data.total;
@@ -1129,7 +1411,7 @@ async function fetchFilterCounts() {
   params.delete('page_size');
   params.delete('tab');  // Badge counts must be independent of active tab
   try {
-    const resp = await fetch(`/api/filter-counts/?${params}`);
+    const resp = await apiFetch(`/api/filter-counts/?${params}`);
     const data = await resp.json();
 
     document.getElementById('total-count-sidebar').textContent = data.total.toLocaleString('id-ID');
@@ -1172,7 +1454,7 @@ async function fetchFilterCounts() {
   }
 }
 
-/* ===== RENDER TABLE ===== */
+/* ===== RENDER TABLE & CARDS ===== */
 function renderPersistedAiScore(r) {
   const score = r.ai_score || 0;
   if (score <= 0) return '<span class="text-slate-300 text-[10px]">&mdash;</span>';
@@ -1182,60 +1464,218 @@ function renderPersistedAiScore(r) {
   return `<button onclick="openTenderDetail(${r.id})" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${label} hover:opacity-80 transition-opacity cursor-pointer">${score}%</button>`;
 }
 
+function renderMobileTenderCard(r) {
+  const tahapBadge = getTahapBadge(r.tahap_saat_ini, r.is_prakualifikasi);
+  const dateStr = r.tanggal_dibuat || r.scraped_at || '-';
+  const itBadge = r.is_it_priority
+    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200" title="Skor Prioritas IT: ${r.priority_score}">🔥 Prioritas IT (${r.priority_score})</span>`
+    : '';
+
+  return `<div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3 fade-in">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <button onclick="openTenderDetail(${r.id})" class="font-mono text-xs text-blue-600 font-semibold hover:underline cursor-pointer">
+        ${esc(r.id_lelang)}
+      </button>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        ${itBadge}
+        ${tahapBadge}
+      </div>
+    </div>
+
+    <div>
+      <button onclick="openTenderDetail(${r.id})" class="text-left w-full cursor-pointer group">
+        <h4 class="text-xs font-semibold text-slate-800 leading-snug group-hover:text-blue-600 transition-colors">
+          ${esc(r.nama_paket)}
+        </h4>
+      </button>
+      <div class="mt-1 flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+        <span class="font-medium text-slate-700">${esc(r.instansi)}</span>
+        <span>&bull;</span>
+        <span>${esc(r.jenis_pengadaan)}</span>
+      </div>
+    </div>
+
+    <div class="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between">
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Nilai HPS</div>
+        <div class="font-mono text-xs font-bold text-slate-800">${esc(r.hps_short)}</div>
+      </div>
+      <div class="text-right">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Tanggal</div>
+        <div class="text-[11px] text-slate-600">${esc(dateStr)}</div>
+      </div>
+    </div>
+
+    <div class="pt-1 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1">
+          <span class="text-[10px] text-slate-400">Kecocokan:</span>
+          <span id="ai-score-mobile-${r.id}">
+            ${renderPersistedAiScore(r)}
+          </span>
+        </div>
+        <div class="flex items-center gap-1">
+          <span class="text-[10px] text-slate-400">Status:</span>
+          <span id="action-mobile-${r.id}">
+            <span class="text-slate-300 text-[10px]">&mdash;</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 ml-auto">
+        <button onclick="runAiMatch(${r.id}, '${esc(r.id_lelang)}')"
+          title="Analisis Kecocokan Kualifikasi"
+          class="min-h-[44px] min-w-[44px] px-2 py-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+          aria-label="Jalankan Analisis AI">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </button>
+        <button onclick="openTenderDetail(${r.id})"
+          class="min-h-[44px] px-3.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+          aria-label="Buka Detail Tender">
+          Detail
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMobileRecommendedCard(r) {
+  const tahapBadge = getTahapBadge(r.tahap_saat_ini, false);
+  const itBadge = r.is_it_priority
+    ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1">🔥 IT</span>'
+    : '';
+  const recColor = (r.opportunity_score || 0) >= 90 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+    : (r.opportunity_score || 0) >= 75 ? 'text-blue-700 bg-blue-50 border-blue-200'
+    : (r.opportunity_score || 0) >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+    : 'text-red-700 bg-red-50 border-red-200';
+  const reasonStr = r.reason ? '<div class="text-[10px] text-slate-400 mt-1 italic">' + esc(r.reason) + '</div>' : '';
+  const strengthStr = (r.strengths || []).length
+    ? '<div class="text-[9px] text-emerald-600 mt-0.5">' + r.strengths.slice(0, 2).map(s => '✓ ' + esc(s)).join(' · ') + '</div>'
+    : '';
+
+  return `<div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3 fade-in">
+    <div class="flex items-center justify-between gap-2 flex-wrap">
+      <button onclick="openTenderDetail(${r.id})" class="font-mono text-xs text-blue-600 font-semibold hover:underline cursor-pointer">
+        ${esc(r.id_lelang || String(r.id))}
+      </button>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        ${itBadge}
+        ${tahapBadge}
+      </div>
+    </div>
+
+    <div>
+      <button onclick="openTenderDetail(${r.id})" class="text-left w-full cursor-pointer group">
+        <h4 class="text-xs font-semibold text-slate-800 leading-snug group-hover:text-blue-600 transition-colors">
+          ${esc(r.nama_paket)}
+        </h4>
+      </button>
+      <div class="mt-1 text-[11px] text-slate-500 font-medium">${esc(r.instansi)}</div>
+      ${reasonStr}
+      ${strengthStr}
+    </div>
+
+    <div class="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between">
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Nilai HPS</div>
+        <div class="font-mono text-xs font-bold text-slate-800">${esc(r.hps_short)}</div>
+      </div>
+      <div class="text-right">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Rekomendasi</div>
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${recColor}">
+          ${r.opportunity_score || 0}% ${esc(r.recommendation)}
+        </span>
+      </div>
+    </div>
+
+    <div class="pt-1 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1">
+        <span class="text-[10px] text-slate-400">AI:</span>
+        ${renderPersistedAiScore(r)}
+      </div>
+      <button onclick="openTenderDetail(${r.id})"
+        class="min-h-[44px] px-3.5 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
+        aria-label="Buka Detail Rekomendasi">
+        Detail
+      </button>
+    </div>
+  </div>`;
+}
+
 function renderResults(results) {
   const tbody = document.getElementById('results-body');
+  const cardsContainer = document.getElementById('results-cards-mobile');
 
   if (!results || results.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="px-4 py-16 text-center text-slate-400">
-      <div class="flex flex-col items-center gap-2">
-        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <span>Tidak ada data ditemukan</span>
-      </div>
-    </td></tr>`;
+    if (tbody) {
+      tbody.innerHTML = renderEmptyState({
+        icon: 'search',
+        title: 'Tidak Ada Data Ditemukan',
+        reason: 'Tidak ada tender yang sesuai dengan kata kunci atau filter aktif saat ini. Coba sesuaikan kata kunci atau atur ulang filter.',
+        ctaLabel: 'Reset Filter',
+        ctaAction: 'resetFilters()',
+        colspan: 10,
+      });
+    }
+    if (cardsContainer) {
+      cardsContainer.innerHTML = renderEmptyState({
+        icon: 'search',
+        title: 'Tidak Ada Data Ditemukan',
+        reason: 'Tidak ada tender yang sesuai dengan kata kunci atau filter aktif saat ini.',
+        ctaLabel: 'Reset Filter',
+        ctaAction: 'resetFilters()',
+      });
+    }
     return;
   }
 
-  tbody.innerHTML = results.map(r => {
-    const tahapBadge = getTahapBadge(r.tahap_saat_ini, r.is_prakualifikasi);
-    const url = esc(r.url_pengumuman);
-    const dateStr = r.tanggal_dibuat || r.scraped_at || '-';
-    const itBadge = r.is_it_priority
-      ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1" title="Skor Prioritas IT: ${r.priority_score}">🔥 Prioritas IT</span>`
-      : '';
-    const scoreCell = r.is_it_priority
-      ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700">${r.priority_score}</span>`
-      : `<span class="text-slate-300">-</span>`;
+  if (tbody) {
+    tbody.innerHTML = results.map(r => {
+      const tahapBadge = getTahapBadge(r.tahap_saat_ini, r.is_prakualifikasi);
+      const url = esc(r.url_pengumuman);
+      const dateStr = r.tanggal_dibuat || r.scraped_at || '-';
+      const itBadge = r.is_it_priority
+        ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1" title="Skor Prioritas IT: ${r.priority_score}">🔥 Prioritas IT</span>`
+        : '';
+      const scoreCell = r.is_it_priority
+        ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700">${r.priority_score}</span>`
+        : `<span class="text-slate-300">-</span>`;
 
-    return `<tr class="hover:bg-blue-50/40 transition-colors fade-in">
-      <td class="px-4 py-3">
-        <button onclick="openTenderDetail(${r.id})"
-           class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left"
-           title="Lihat detail tender">${esc(r.id_lelang)}</button>
-      </td>
-      <td class="px-4 py-3">
-        <button onclick="openTenderDetail(${r.id})" class="text-left w-full cursor-pointer">
-          <div class="text-xs font-semibold text-slate-800 leading-snug">${esc(r.nama_paket)}${itBadge}</div>
-          <div class="text-[10px] text-slate-400 mt-0.5">${esc(r.jenis_pengadaan)}</div>
-        </button>
-      </td>
-      <td class="px-4 py-3 text-xs text-slate-600">${esc(r.instansi)}</td>
-      <td class="px-4 py-3">${tahapBadge}</td>
-      <td class="px-4 py-3 text-center">${scoreCell}</td>
-      <td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">${esc(dateStr)}</td>
-      <td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700 whitespace-nowrap">${esc(r.hps_short)}</td>
-      <td class="px-4 py-3 text-center" id="ai-score-${r.id}">
-        ${renderPersistedAiScore(r)}
-      </td>
-      <td class="px-4 py-3 text-center" id="action-${r.id}">
-        <span class="text-slate-300 text-[10px]">&mdash;</span>
-      </td>
-      <td class="px-4 py-3 text-center">
-        <button onclick="runAiMatch(${r.id}, '${esc(r.id_lelang)}')" title="Analisis Kecocokan Kualifikasi" class="p-1 text-slate-400 hover:text-blue-600 transition-colors">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-        </button>
-      </td>
-    </tr>`;
-  }).join('');
+      return `<tr class="hover:bg-blue-50/40 transition-colors fade-in">
+        <td class="px-4 py-3">
+          <button onclick="openTenderDetail(${r.id})"
+             class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left"
+             title="Lihat detail tender">${esc(r.id_lelang)}</button>
+        </td>
+        <td class="px-4 py-3">
+          <button onclick="openTenderDetail(${r.id})" class="text-left w-full cursor-pointer">
+            <div class="text-xs font-semibold text-slate-800 leading-snug">${esc(r.nama_paket)}${itBadge}</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">${esc(r.jenis_pengadaan)}</div>
+          </button>
+        </td>
+        <td class="px-4 py-3 text-xs text-slate-600">${esc(r.instansi)}</td>
+        <td class="px-4 py-3">${tahapBadge}</td>
+        <td class="px-4 py-3 text-center">${scoreCell}</td>
+        <td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">${esc(dateStr)}</td>
+        <td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700 whitespace-nowrap">${esc(r.hps_short)}</td>
+        <td class="px-4 py-3 text-center" id="ai-score-${r.id}">
+          ${renderPersistedAiScore(r)}
+        </td>
+        <td class="px-4 py-3 text-center" id="action-${r.id}">
+          <span class="text-slate-300 text-[10px]">&mdash;</span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button onclick="runAiMatch(${r.id}, '${esc(r.id_lelang)}')" title="Analisis Kecocokan Kualifikasi" class="p-1 text-slate-400 hover:text-blue-600 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  if (cardsContainer) {
+    cardsContainer.innerHTML = results.map(renderMobileTenderCard).join('');
+  }
 }
 
 /* ===== TAHAP BADGE ===== */
@@ -1290,10 +1730,10 @@ async function startCrawl() {
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  btnText.textContent = 'Syncing...';
+  btnText.textContent = 'Menyinkronkan...';
   statusEl.classList.remove('hidden');
   statusEl.className = 'mt-2 text-[10px] text-blue-600';
-  statusEl.textContent = 'Memulai crawl...';
+  statusEl.textContent = 'Memulai sinkronisasi...';
 
   try {
     const form = new URLSearchParams();
@@ -1312,15 +1752,15 @@ async function startCrawl() {
 
     if (!resp.ok || data.error) {
       statusEl.className = 'mt-2 text-[10px] text-red-600';
-      statusEl.textContent = 'Error: ' + (data.error || 'Unknown error');
+      statusEl.textContent = 'Gagal: ' + (data.error || 'Terjadi kesalahan');
       btn.disabled = false;
       spinner.classList.add('hidden');
-      btnText.textContent = 'Sync Data Baru';
+      btnText.textContent = 'Perbarui Data';
       return;
     }
 
     statusEl.className = 'mt-2 text-[10px] text-blue-600';
-    statusEl.textContent = `Crawl berjalan — ${data.instansi_count || '?'} instansi, ${data.workers} workers`;
+    statusEl.textContent = `Sinkronisasi berjalan: ${data.instansi_count || '?'} instansi, ${data.workers} pekerja`;
     pollCrawlStatus();
   } catch (e) {
     statusEl.className = 'mt-2 text-[10px] text-red-600';
@@ -1328,7 +1768,7 @@ async function startCrawl() {
   } finally {
     btn.disabled = false;
     spinner.classList.add('hidden');
-    btnText.textContent = 'Sync Data Baru';
+    btnText.textContent = 'Perbarui Data';
   }
 }
 
@@ -1356,15 +1796,15 @@ function pollCrawlStatus() {
 
         if (latest && latest.status === 'completed') {
           statusEl.className = 'mt-2 text-[10px] text-emerald-600';
-          statusEl.textContent = `Crawl selesai — ${latest.total_details} paket tersimpan`;
+          statusEl.textContent = `Sinkronisasi selesai: ${latest.total_details} paket tersimpan`;
           updateMonitorStatus('Completed', 100);
         } else if (latest && latest.status === 'failed') {
           statusEl.className = 'mt-2 text-[10px] text-red-600';
-          statusEl.textContent = 'Crawl gagal — cek log terminal untuk detail';
+          statusEl.textContent = 'Sinkronisasi gagal: periksa log server untuk detail';
           updateMonitorStatus('Failed', -1);
         } else {
           statusEl.className = 'mt-2 text-[10px] text-slate-500';
-          statusEl.textContent = 'Crawl selesai';
+          statusEl.textContent = 'Sinkronisasi selesai';
           updateMonitorStatus('Completed', 100);
         }
 
@@ -1407,6 +1847,7 @@ function toggleMonitorPanel() {
 }
 
 async function fetchMonitorProgress() {
+  if (!document.getElementById('monitor-status-badge')) return;
   try {
     const resp = await fetch('/api/crawl-progress/');
     const p = await resp.json();
@@ -1417,6 +1858,7 @@ async function fetchMonitorProgress() {
 function updateMonitorPanel(p) {
   // Status badge
   const badge = document.getElementById('monitor-status-badge');
+  if (!badge) return;
   const colors = {
     'Idle': 'bg-slate-100 text-slate-500',
     'Running': 'bg-blue-100 text-blue-700 progress-pulse',
@@ -1428,6 +1870,7 @@ function updateMonitorPanel(p) {
 
   // Progress bar
   const bar = document.getElementById('monitor-progress-bar');
+  if (!bar) return;
   const pct = p.percentage || 0;
   bar.style.width = `${pct}%`;
   if (p.status === 'Failed') {
@@ -1439,31 +1882,43 @@ function updateMonitorPanel(p) {
   }
 
   // Counter
-  document.getElementById('monitor-counter').textContent =
-    `Memproses ${p.processed_packages || 0} dari ${p.total_packages || 0} paket (${Math.round(pct)}%)`;
+  const counterEl = document.getElementById('monitor-counter');
+  if (counterEl) {
+    counterEl.textContent =
+      `Memproses ${p.processed_packages || 0} dari ${p.total_packages || 0} paket (${Math.round(pct)}%)`;
+  }
 
   // Saved / Skipped / Errors
-  document.getElementById('monitor-saved').textContent = p.saved_packages || 0;
-  document.getElementById('monitor-skipped').textContent = p.skipped_packages || 0;
-  document.getElementById('monitor-errors').textContent = p.error_packages || 0;
+  const savedEl = document.getElementById('monitor-saved');
+  if (savedEl) savedEl.textContent = p.saved_packages || 0;
+  const skippedEl = document.getElementById('monitor-skipped');
+  if (skippedEl) skippedEl.textContent = p.skipped_packages || 0;
+  const errorsEl = document.getElementById('monitor-errors');
+  if (errorsEl) errorsEl.textContent = p.error_packages || 0;
 
   // Instansi
-  document.getElementById('monitor-instansi-progress').textContent = p.completed_instansi || 0;
-  document.getElementById('monitor-instansi-total').textContent = p.total_instansi || 0;
-  document.getElementById('monitor-current-instansi').textContent = p.current_instansi || '-';
+  const instProgEl = document.getElementById('monitor-instansi-progress');
+  if (instProgEl) instProgEl.textContent = p.completed_instansi || 0;
+  const instTotEl = document.getElementById('monitor-instansi-total');
+  if (instTotEl) instTotEl.textContent = p.total_instansi || 0;
+  const currInstEl = document.getElementById('monitor-current-instansi');
+  if (currInstEl) currInstEl.textContent = p.current_instansi || '-';
 
   // Elapsed
   const elapsed = p.elapsed_seconds || 0;
-  document.getElementById('monitor-elapsed').textContent = elapsed > 0 ? formatDuration(elapsed) : '';
+  const elapsedEl = document.getElementById('monitor-elapsed');
+  if (elapsedEl) elapsedEl.textContent = elapsed > 0 ? formatDuration(elapsed) : '';
 
   // ETA
   const etaEl = document.getElementById('monitor-eta');
-  if (p.status === 'Running' && p.estimated_remaining > 0) {
-    etaEl.textContent = `Estimasi selesai: ~${formatDuration(p.estimated_remaining)}`;
-  } else if (p.status === 'Completed') {
-    etaEl.textContent = `Selesai dalam ${formatDuration(elapsed)}`;
-  } else {
-    etaEl.textContent = '';
+  if (etaEl) {
+    if (p.status === 'Running' && p.estimated_remaining > 0) {
+      etaEl.textContent = `Estimasi selesai: ~${formatDuration(p.estimated_remaining)}`;
+    } else if (p.status === 'Completed') {
+      etaEl.textContent = `Selesai dalam ${formatDuration(elapsed)}`;
+    } else {
+      etaEl.textContent = '';
+    }
   }
 
   // Activity log (keep last 3)
@@ -1473,9 +1928,11 @@ function updateMonitorPanel(p) {
       _monitorActivityLog.unshift(entry);
       if (_monitorActivityLog.length > 3) _monitorActivityLog.pop();
       const logEl = document.getElementById('monitor-activity-log');
-      logEl.innerHTML = _monitorActivityLog.map(a =>
-        `<div class="text-[10px] text-slate-600 font-mono truncate">${esc(a)}</div>`
-      ).join('');
+      if (logEl) {
+        logEl.innerHTML = _monitorActivityLog.map(a =>
+          `<div class="text-[10px] text-slate-600 font-mono truncate">${esc(a)}</div>`
+        ).join('');
+      }
     }
   }
 
@@ -1486,6 +1943,7 @@ function updateMonitorPanel(p) {
 
 function updateMonitorStatus(status, pct) {
   const badge = document.getElementById('monitor-status-badge');
+  if (!badge) return;
   const colors = {
     'Completed': 'bg-emerald-100 text-emerald-700',
     'Failed': 'bg-red-100 text-red-700',
@@ -1495,8 +1953,10 @@ function updateMonitorStatus(status, pct) {
 
   if (pct >= 0) {
     const bar = document.getElementById('monitor-progress-bar');
-    bar.style.width = `${pct}%`;
-    bar.className = `progress-bar-fill ${status === 'Completed' ? 'bg-emerald-500' : 'bg-red-500'} h-2.5 rounded-full`;
+    if (bar) {
+      bar.style.width = `${pct}%`;
+      bar.className = `progress-bar-fill ${status === 'Completed' ? 'bg-emerald-500' : 'bg-red-500'} h-2.5 rounded-full`;
+    }
   }
 }
 
@@ -1535,11 +1995,13 @@ function appendFilterDownload(a) {
 
 /* ===== FLUSH RECORDS ===== */
 function openFlushModal() {
-  document.getElementById('flush-modal').classList.remove('hidden');
+  const m = document.getElementById('flush-modal');
+  if (m) m.classList.remove('hidden');
 }
 
 function closeFlushModal() {
-  document.getElementById('flush-modal').classList.add('hidden');
+  const m = document.getElementById('flush-modal');
+  if (m) m.classList.add('hidden');
 }
 
 async function flushRecords(mode) {
@@ -1554,15 +2016,19 @@ async function flushRecords(mode) {
   if (mode === 'all') {
     const confirm = window.prompt('Ketik "RESET" untuk konfirmasi hapus SEMUA data:');
     if (confirm !== 'RESET') {
-      statusEl.textContent = 'Dibatalkan.';
-      statusEl.className = 'mt-1.5 text-[10px] text-slate-400 text-center';
+      if (statusEl) {
+        statusEl.textContent = 'Dibatalkan.';
+        statusEl.className = 'mt-1.5 text-[10px] text-slate-400 text-center';
+      }
       closeFlushModal();
       return;
     }
   }
 
-  statusEl.textContent = `Menghapus data ${labels[mode]}...`;
-  statusEl.className = 'mt-1.5 text-[10px] text-amber-600 text-center font-medium';
+  if (statusEl) {
+    statusEl.textContent = `Menghapus data ${labels[mode]}...`;
+    statusEl.className = 'mt-1.5 text-[10px] text-amber-600 text-center font-medium';
+  }
 
   try {
     const formData = new FormData();
@@ -1578,18 +2044,24 @@ async function flushRecords(mode) {
     const data = await resp.json();
 
     if (data.status === 'success') {
-      statusEl.textContent = `Berhasil menghapus ${data.deleted_count.toLocaleString('id-ID')} data. Sisa: ${data.remaining_count.toLocaleString('id-ID')}`;
-      statusEl.className = 'mt-1.5 text-[10px] text-emerald-600 text-center font-medium';
+      if (statusEl) {
+        statusEl.textContent = `Berhasil menghapus ${data.deleted_count.toLocaleString('id-ID')} data. Sisa: ${data.remaining_count.toLocaleString('id-ID')}`;
+        statusEl.className = 'mt-1.5 text-[10px] text-emerald-600 text-center font-medium';
+      }
       // Refresh table and counters
       fetchResults();
       fetchFilterCounts();
     } else {
-      statusEl.textContent = `Gagal: ${data.message || 'Unknown error'}`;
-      statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+      if (statusEl) {
+        statusEl.textContent = `Gagal: ${data.message || 'Unknown error'}`;
+        statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+      }
     }
   } catch (e) {
-    statusEl.textContent = `Error: ${e.message}`;
-    statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+    if (statusEl) {
+      statusEl.textContent = `Error: ${e.message}`;
+      statusEl.className = 'mt-1.5 text-[10px] text-red-600 text-center font-medium';
+    }
   }
 
   closeFlushModal();
@@ -1597,12 +2069,16 @@ async function flushRecords(mode) {
 
 /* ===== KBLI CRUD ===== */
 function openKbliModal() {
-  document.getElementById('kbli-modal').classList.remove('hidden');
-  loadKbliList();
+  const m = document.getElementById('kbli-modal');
+  if (m) {
+    m.classList.remove('hidden');
+    loadKbliList();
+  }
 }
 
 function closeKbliModal() {
-  document.getElementById('kbli-modal').classList.add('hidden');
+  const m = document.getElementById('kbli-modal');
+  if (m) m.classList.add('hidden');
 }
 
 async function loadKbliList() {
@@ -1614,25 +2090,30 @@ async function loadKbliList() {
       container.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Belum ada data KBLI</div>';
       return;
     }
-    container.innerHTML = data.items.map(k => `
-      <div class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-slate-50 border border-slate-100 group" id="kbli-row-${k.code}">
-        <input type="checkbox" ${k.is_active ? 'checked' : ''} onchange="toggleKbliActive('${k.code}', this.checked)" class="w-3.5 h-3.5 rounded">
+    container.innerHTML = data.items.map(k => {
+      const code = esc(k.code);
+      const name = esc(k.name);
+      const codeJs = esc(String(k.code || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+      return `
+      <div class="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-slate-50 border border-slate-100 group" id="kbli-row-${code}">
+        <input type="checkbox" ${k.is_active ? 'checked' : ''} onchange="toggleKbliActive('${codeJs}', this.checked)" class="w-3.5 h-3.5 rounded">
         <div class="flex-1 min-w-0">
-          <div class="text-xs font-mono font-bold text-slate-700">${k.code}</div>
-          <div class="text-[10px] text-slate-500 truncate" title="${k.name}">${k.name}</div>
+          <div class="text-xs font-mono font-bold text-slate-700">${code}</div>
+          <div class="text-[10px] text-slate-500 truncate" title="${name}">${name}</div>
         </div>
         <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onclick="editKbli('${k.code}')" title="Edit" class="p-1 rounded hover:bg-slate-200 transition-colors">
+          <button onclick="editKbli('${codeJs}')" title="Edit" class="p-1 rounded hover:bg-slate-200 transition-colors">
             <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
           </button>
-          <button onclick="deleteKbli('${k.code}')" title="Hapus" class="p-1 rounded hover:bg-red-100 transition-colors">
+          <button onclick="deleteKbli('${codeJs}')" title="Hapus" class="p-1 rounded hover:bg-red-100 transition-colors">
             <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (e) {
-    container.innerHTML = `<div class="text-xs text-red-500 text-center py-4">Gagal memuat: ${e.message}</div>`;
+    container.innerHTML = `<div class="text-xs text-red-500 text-center py-4">Gagal memuat: ${esc(e.message)}</div>`;
   }
 }
 
@@ -1725,14 +2206,19 @@ async function refreshKbliSidebar() {
     const checkedValues = [];
     container.querySelectorAll('input[name="kbli_code"]:checked').forEach(cb => checkedValues.push(cb.value));
 
-    container.innerHTML = (data.items || []).filter(k => k.is_active).map(k => `
+    container.innerHTML = (data.items || []).filter(k => k.is_active).map(k => {
+      const code = esc(k.code);
+      const name = esc(k.name);
+      const nameShort = esc(String(k.name || '').substring(0, 30));
+      return `
       <label class="flex items-center gap-2 cursor-pointer group">
-        <input type="checkbox" name="kbli_code" value="${k.code}" class="kbli-cb w-3.5 h-3.5 rounded"
+        <input type="checkbox" name="kbli_code" value="${code}" class="kbli-cb w-3.5 h-3.5 rounded"
           ${checkedValues.includes(k.code) ? 'checked' : ''} onchange="applyFilters()">
-        <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1 truncate" title="${k.code} — ${k.name}">${k.code} — ${k.name.substring(0, 30)}</span>
-        <span class="text-[10px] text-slate-400 font-mono tabular-nums" id="kbli-count-${k.code}">0</span>
+        <span class="text-xs text-slate-600 group-hover:text-slate-900 flex-1 truncate" title="${code}: ${name}">${code}: ${nameShort}</span>
+        <span class="text-[10px] text-slate-500 font-mono tabular-nums" id="kbli-count-${code}">0</span>
       </label>
-    `).join('');
+    `;
+    }).join('');
     fetchFilterCounts();
   } catch (e) {
     console.error('Failed to refresh KBLI sidebar:', e);
@@ -1751,14 +2237,17 @@ const SUBMISSION_STATUSES = {
 
 async function loadSubmissionStatuses() {
   try {
-    const resp = await fetch('/api/submission/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/submission/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (!resp.ok) return;
     const data = await resp.json();
     (data.items || []).forEach(s => {
       const cell = document.getElementById('action-' + s.tender_id);
-      if (!cell) return;
+      const cellMobile = document.getElementById('action-mobile-' + s.tender_id);
+      if (!cell && !cellMobile) return;
       const info = SUBMISSION_STATUSES[s.status] || SUBMISSION_STATUSES['belum_diproses'];
-      cell.innerHTML = '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ' + info.cls + '">' + esc(info.label) + '</span>';
+      const badgeHtml = '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ' + info.cls + '">' + esc(info.label) + '</span>';
+      if (cell) cell.innerHTML = badgeHtml;
+      if (cellMobile) cellMobile.innerHTML = badgeHtml;
     });
   } catch (e) { /* silent */ }
 }
@@ -1767,8 +2256,11 @@ async function loadSubmissionStatuses() {
 let _companyId = null;
 let _qualifications = [];
 
-function openCompanyModal() {
+function openCompanyModal(tab) {
   document.getElementById('company-modal').classList.remove('hidden');
+  if (tab) {
+    switchCompanyTab(tab);
+  }
   loadCompanyData();
 }
 
@@ -1779,31 +2271,37 @@ function closeCompanyModal() {
 function switchCompanyTab(tab) {
   document.querySelectorAll('.company-tab').forEach(b => {
     b.classList.remove('text-blue-700', 'border-blue-600');
-    b.classList.add('text-slate-500', 'border-transparent');
+    b.classList.add('text-slate-600', 'border-transparent');
+    b.setAttribute('aria-selected', 'false');
   });
   const active = document.getElementById('ctab-' + tab);
-  active.classList.remove('text-slate-500', 'border-transparent');
-  active.classList.add('text-blue-700', 'border-blue-600');
+  if (active) {
+    active.classList.remove('text-slate-600', 'border-transparent');
+    active.classList.add('text-blue-700', 'border-blue-600');
+    active.setAttribute('aria-selected', 'true');
+  }
 
-  document.getElementById('company-tab-profile').classList.toggle('hidden', tab !== 'profile');
-  document.getElementById('company-tab-quals').classList.toggle('hidden', tab !== 'quals');
+  const pTab = document.getElementById('company-tab-profile');
+  const qTab = document.getElementById('company-tab-quals');
+  if (pTab) pTab.classList.toggle('hidden', tab !== 'profile');
+  if (qTab) qTab.classList.toggle('hidden', tab !== 'quals');
 }
 
 async function loadCompanyData() {
   try {
-    const resp = await fetch('/api/company/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/company/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     const data = await resp.json();
     const items = data.items || [];
 
     // Find company for current user (superadmin picks first, others use their own)
-    const meResp = await fetch('/api/auth/me/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const meResp = await apiFetch('/api/auth/me/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     const me = await meResp.json();
 
     let company = null;
     if (me.company_id) {
       company = items.find(c => c.id === me.company_id);
-    } else if (items.length > 0) {
-      company = items[0]; // superadmin: pick first
+    } else if (me.role === 'superadmin' && items.length > 0) {
+      company = items[0]; // superadmin only: pick first
     }
 
     if (company) {
@@ -1828,22 +2326,168 @@ async function loadCompanyData() {
       loadQualifications(company.id);
     } else {
       document.getElementById('company-profile-form').classList.add('hidden');
-      document.getElementById('company-profile-empty').classList.remove('hidden');
+      const emptyProfileEl = document.getElementById('company-profile-empty');
+      emptyProfileEl.classList.remove('hidden');
+      emptyProfileEl.innerHTML = renderEmptyState({
+        icon: 'building',
+        title: 'Profil Perusahaan Belum Tersedia',
+        reason: 'Perusahaan Anda belum memiliki data profil terdaftar. Lengkapi nama dan NIB untuk mengaktifkan fitur pencocokan AI.',
+        ctaLabel: 'Buat Profil Perusahaan',
+        ctaAction: 'showCompanyProfileForm()',
+      });
       document.getElementById('btn-save-company').classList.add('hidden');
       document.getElementById('btn-add-qual').classList.add('hidden');
-      document.getElementById('qual-list').innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Buat profil perusahaan terlebih dahulu</div>';
+      document.getElementById('qual-list').innerHTML = renderEmptyState({
+        icon: 'building',
+        title: 'Profil Perusahaan Belum Dibuat',
+        reason: 'Buat profil perusahaan terlebih dahulu pada tab Profil sebelum menambahkan data kualifikasi.',
+        ctaLabel: 'Ke Tab Profil',
+        ctaAction: "switchCompanyTab('profile')",
+      });
     }
 
     // Update sidebar info
     const sideInfo = document.getElementById('company-sidebar-info');
-    if (company) {
-      sideInfo.innerHTML = `<span class="font-medium text-slate-600">${esc(company.name)}</span><br><span class="text-slate-400">NIB: ${esc(company.nib)}</span>`;
-    } else {
-      sideInfo.textContent = 'Belum ada profil';
+    if (sideInfo) {
+      if (company) {
+        sideInfo.innerHTML = `<span class="font-medium text-slate-600">${esc(company.name)}</span><br><span class="text-slate-400">NIB: ${esc(company.nib)}</span>`;
+      } else {
+        sideInfo.textContent = 'Belum ada profil';
+      }
     }
+
+    // Update completion banner
+    loadCompanyCompletion();
   } catch (e) {
     console.error('Failed to load company data:', e);
   }
+}
+
+/* ===== COMPANY COMPLETION (UX-006) ===== */
+async function loadCompanyCompletion() {
+  if (!IS_AUTHENTICATED) return;
+  const banner = document.getElementById('company-completion-banner');
+  if (!banner) return;
+
+  try {
+    let url = '/api/company/completion/';
+    if (_companyId) {
+      url += '?company_id=' + encodeURIComponent(_companyId);
+    }
+    const resp = await apiFetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderCompanyCompletionBanner(data);
+  } catch (e) {
+    console.error('Failed to load company completion:', e);
+  }
+}
+
+function renderCompanyCompletionBanner(data) {
+  const banner = document.getElementById('company-completion-banner');
+  if (!banner) return;
+
+  const pct = Math.max(0, Math.min(100, Math.round(data.completion_pct || 0)));
+  const iconWrapper = document.getElementById('completion-icon-wrapper');
+  const iconSvg = document.getElementById('completion-icon-svg');
+  const badge = document.getElementById('completion-badge');
+  const barFill = document.getElementById('completion-bar-fill');
+  const guidance = document.getElementById('completion-guidance');
+  const ctaBtn = document.getElementById('completion-cta-btn');
+  const ctaText = document.getElementById('completion-cta-text');
+
+  if (pct === 100) {
+    // 100% complete state
+    banner.className = 'border-b border-emerald-200 bg-emerald-50/70 px-4 md:px-6 py-2.5 flex-shrink-0 transition-colors';
+    if (iconWrapper) iconWrapper.className = 'w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0';
+    if (iconSvg) {
+      iconSvg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+      iconSvg.className = 'w-4 h-4 text-emerald-700';
+    }
+    if (badge) {
+      badge.textContent = '100% Siap ✓';
+      badge.className = 'px-1.5 py-0.5 rounded text-[11px] font-bold font-mono bg-emerald-100 text-emerald-800';
+    }
+    if (barFill) {
+      barFill.style.width = '100%';
+      barFill.className = 'h-full bg-emerald-600 rounded-full transition-all duration-500';
+    }
+    if (guidance) {
+      guidance.textContent = 'Profil Perusahaan lengkap. Data kualifikasi dan legal siap untuk AI Match & Radar.';
+      guidance.title = guidance.textContent;
+    }
+    if (ctaBtn) {
+      ctaBtn.className = 'px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1.5';
+      ctaBtn.onclick = () => openCompanyModal('profile');
+    }
+    if (ctaText) ctaText.textContent = 'Kelola Profil';
+  } else {
+    // Incomplete state (< 100%)
+    const cats = data.categories || {};
+    let guidanceMsg = '';
+    let targetTab = 'profile';
+    let ctaLabel = 'Lengkapi Profil';
+
+    if ((cats.identitas ?? 0) < 100) {
+      guidanceMsg = 'Nama perusahaan atau NIB belum terisi. Lengkapi data legalitas utama.';
+      targetTab = 'profile';
+      ctaLabel = 'Isi NIB & Nama';
+    } else if ((cats.kualifikasi ?? 0) < 100) {
+      guidanceMsg = 'Tambahkan Izin Usaha / SBU aktif untuk mengaktifkan kalkulasi AI Match tender.';
+      targetTab = 'quals';
+      ctaLabel = 'Tambah Kualifikasi';
+    } else if ((cats.keuangan ?? 0) < 100) {
+      guidanceMsg = 'Lengkapi modal disetor & omset tahunan untuk verifikasi nilai paket tender.';
+      targetTab = 'profile';
+      ctaLabel = 'Isi Keuangan';
+    } else if ((cats.pengalaman ?? 0) < 100) {
+      guidanceMsg = 'Tambahkan riwayat pengalaman kerja untuk meningkatkan skor evaluasi teknis tender.';
+      targetTab = 'quals';
+      ctaLabel = 'Tambah Pengalaman';
+    } else if ((cats.legal_kontak ?? 0) < 100) {
+      guidanceMsg = 'Lengkapi data kontak, alamat, dan penanggung jawab perusahaan.';
+      targetTab = 'profile';
+      ctaLabel = 'Lengkapi Kontak';
+    } else if ((cats.sdm ?? 0) < 100) {
+      guidanceMsg = 'Tambahkan personil manajerial / tenaga ahli perusahaan.';
+      targetTab = 'quals';
+      ctaLabel = 'Tambah SDM';
+    } else {
+      guidanceMsg = 'Lengkapi kualifikasi perusahaan untuk mengoptimalkan rekomendasi tender.';
+      targetTab = 'profile';
+      ctaLabel = 'Lengkapi Profil';
+    }
+
+    if (pct < 50) {
+      banner.className = 'border-b border-amber-200 bg-amber-50/60 px-4 md:px-6 py-2.5 flex-shrink-0 transition-colors';
+      if (iconWrapper) iconWrapper.className = 'w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0';
+      if (badge) badge.className = 'px-1.5 py-0.5 rounded text-[11px] font-bold font-mono bg-amber-100 text-amber-800';
+      if (barFill) barFill.className = 'h-full bg-amber-500 rounded-full transition-all duration-500';
+    } else {
+      banner.className = 'border-b border-blue-100 bg-blue-50/40 px-4 md:px-6 py-2.5 flex-shrink-0 transition-colors';
+      if (iconWrapper) iconWrapper.className = 'w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0';
+      if (badge) badge.className = 'px-1.5 py-0.5 rounded text-[11px] font-bold font-mono bg-blue-100 text-blue-800';
+      if (barFill) barFill.className = 'h-full bg-blue-600 rounded-full transition-all duration-500';
+    }
+
+    if (iconSvg) {
+      iconSvg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>';
+      iconSvg.className = 'w-4 h-4 ' + (pct < 50 ? 'text-amber-700' : 'text-blue-700');
+    }
+    if (badge) badge.textContent = pct + '%';
+    if (barFill) barFill.style.width = pct + '%';
+    if (guidance) {
+      guidance.textContent = guidanceMsg;
+      guidance.title = guidanceMsg;
+    }
+    if (ctaBtn) {
+      ctaBtn.className = 'px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm';
+      ctaBtn.onclick = () => openCompanyModal(targetTab);
+    }
+    if (ctaText) ctaText.textContent = ctaLabel;
+  }
+
+  banner.classList.remove('hidden');
 }
 
 async function createCompanyProfile() {
@@ -1916,7 +2560,13 @@ async function loadQualifications(companyId) {
 
     const list = document.getElementById('qual-list');
     if (_qualifications.length === 0) {
-      list.innerHTML = '<div class="text-xs text-slate-400 text-center py-6">Belum ada data kualifikasi</div>';
+      list.innerHTML = renderEmptyState({
+        icon: 'document',
+        title: 'Belum Ada Data Kualifikasi',
+        reason: 'Tambahkan izin usaha, SBU, sertifikasi, atau pengalaman kerja untuk meningkatkan akurasi analisis AI.',
+        ctaLabel: '+ Tambah Kualifikasi',
+        ctaAction: 'showQualForm()',
+      });
       return;
     }
 
@@ -2081,6 +2731,7 @@ async function saveQualification() {
     if (data.status === 'success') {
       hideQualForm();
       loadQualifications(_companyId);
+      loadCompanyCompletion();
     } else {
       alert(data.message || 'Gagal menyimpan');
     }
@@ -2099,6 +2750,7 @@ async function deleteQualification(qualId) {
     const data = await resp.json();
     if (data.status === 'success') {
       loadQualifications(_companyId);
+      loadCompanyCompletion();
     } else {
       alert(data.message || 'Gagal menghapus');
     }
@@ -2111,7 +2763,12 @@ async function deleteQualification(qualId) {
 async function runAiMatch(tenderId, tenderCode) {
   if (!tenderId) { alert('ID tender tidak tersedia'); return; }
   const cell = document.getElementById('ai-score-' + tenderId);
-  if (cell) cell.innerHTML = '<span class="text-[10px] text-blue-500">Analyzing...</span>';
+  const cellMobile = document.getElementById('ai-score-mobile-' + tenderId);
+  const setStatusText = (html) => {
+    if (cell) cell.innerHTML = html;
+    if (cellMobile) cellMobile.innerHTML = html;
+  };
+  setStatusText('<span class="text-[10px] text-blue-500">Analyzing...</span>');
 
   try {
     const resp = await fetch('/api/match/run/', {
@@ -2121,34 +2778,37 @@ async function runAiMatch(tenderId, tenderCode) {
     });
     const data = await resp.json();
     if (resp.status === 401) {
-      if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="Silakan login terlebih dahulu">Login required</span>';
+      setStatusText('<span class="text-[10px] text-red-400" title="Silakan login terlebih dahulu">Login required</span>');
       return;
     }
     if (resp.status === 503) {
-      if (cell) cell.innerHTML = '<span class="text-[10px] text-amber-400" title="AI provider tidak tersedia">AI off</span>';
+      setStatusText('<span class="text-[10px] text-amber-400" title="AI provider tidak tersedia">AI off</span>');
       return;
     }
     if (data.error) {
       const shortErr = data.error.length > 40 ? data.error.substring(0, 40) + '...' : data.error;
-      if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="' + esc(data.error) + '">Error: ' + esc(shortErr) + '</span>';
+      setStatusText('<span class="text-[10px] text-red-400" title="' + esc(data.error) + '">Error: ' + esc(shortErr) + '</span>');
       return;
     }
     const r = data.result || {};
     renderAiScore(tenderId, tenderCode, r);
     if (r.fit_score !== undefined) showAiModal(r, tenderCode);
   } catch (e) {
-    if (cell) cell.innerHTML = '<span class="text-[10px] text-red-400" title="' + esc(e.message) + '">Network Error</span>';
+    setStatusText('<span class="text-[10px] text-red-400" title="' + esc(e.message) + '">Network Error</span>');
   }
 }
 
 function renderAiScore(tenderId, tenderCode, r) {
   const cell = document.getElementById('ai-score-' + tenderId);
-  if (!cell) return;
+  const cellMobile = document.getElementById('ai-score-mobile-' + tenderId);
+  if (!cell && !cellMobile) return;
   const score = r.fit_score || 0;
   let color = 'red', label = 'bg-red-50 text-red-700 border-red-200';
   if (score >= 71) { color = 'green'; label = 'bg-emerald-50 text-emerald-700 border-emerald-200'; }
   else if (score >= 41) { color = 'yellow'; label = 'bg-amber-50 text-amber-700 border-amber-200'; }
-  cell.innerHTML = '<button onclick="openTenderDetail(' + tenderId + ')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + label + ' hover:opacity-80 transition-opacity cursor-pointer">' + score + '%</button>';
+  const btnHtml = '<button onclick="openTenderDetail(' + tenderId + ')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + label + ' hover:opacity-80 transition-opacity cursor-pointer">' + score + '%</button>';
+  if (cell) cell.innerHTML = btnHtml;
+  if (cellMobile) cellMobile.innerHTML = btnHtml;
 }
 
 function showAiModal(r, tenderCode) {
@@ -2175,23 +2835,28 @@ function showAiModal(r, tenderCode) {
   else if (score >= 41) badgeColor = 'bg-amber-100 text-amber-700';
 
   const html = `
-    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="closeAiModal(event)">
+    <div id="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="closeAiModal(event)">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
         <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 class="text-sm font-bold text-slate-800">Tingkat Kecocokan</h3>
-            <p class="text-[10px] text-slate-400 mt-0.5">${esc(tenderCode)} &middot; ${esc(r.llm_provider || 'N/A')}</p>
+            <h3 id="ai-modal-title" class="text-sm font-bold text-slate-800">Tingkat Kecocokan</h3>
+            <p class="text-[10px] text-slate-500 mt-0.5">${esc(tenderCode)} &middot; ${esc(r.llm_provider || 'N/A')}</p>
           </div>
-          <span class="px-3 py-1 rounded-full text-sm font-bold ${badgeColor}">${score}%</span>
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full text-sm font-bold ${badgeColor}">${score}%</span>
+            <button onclick="closeAiModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors" aria-label="Tutup dialog kecocokan AI">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
         <div class="px-6 py-3 border-b border-slate-100 bg-slate-50">
-          <div class="text-xs text-slate-600">${esc(r.summary || 'No summary available')}</div>
+          <div class="text-xs text-slate-700">${esc(r.summary || 'Tidak ada ringkasan')}</div>
         </div>
         <div class="px-6 py-4 overflow-y-auto max-h-[50vh] space-y-2">
-          ${criteriaHtml || '<div class="text-xs text-slate-400 text-center py-4">Tidak ada kriteria ditemukan</div>'}
+          ${criteriaHtml || '<div class="text-xs text-slate-500 text-center py-4">Tidak ada kriteria ditemukan</div>'}
         </div>
         <div class="px-6 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
-          <button onclick="closeAiModal()" class="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
+          <button onclick="closeAiModal()" class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 transition-colors">Tutup</button>
         </div>
       </div>
     </div>`;
@@ -2199,8 +2864,8 @@ function showAiModal(r, tenderCode) {
 }
 
 function closeAiModal(e) {
-  if (e && e.target !== e.currentTarget) return;
-  const overlay = document.querySelector('[onclick*="closeAiModal"]');
+  if (e && e.target !== e.currentTarget && !e.target.closest('button')) return;
+  const overlay = document.getElementById('ai-modal') || document.querySelector('[onclick*="closeAiModal"]');
   if (overlay) overlay.remove();
 }
 
@@ -2247,7 +2912,7 @@ function renderTenderDetail(d) {
   document.getElementById('tdm-lokasi').textContent = d.lokasi_pekerjaan || '-';
   document.getElementById('tdm-tahun').textContent = d.tahun_anggaran || '-';
   document.getElementById('tdm-peserta').textContent = d.peserta_count ? `${d.peserta_count} peserta` : '-';
-  document.getElementById('tdm-kbli').textContent = d.kbli_code ? `${d.kbli_code} — ${d.kbli_description}` : '-';
+  document.getElementById('tdm-kbli').textContent = d.kbli_code ? `${d.kbli_code}: ${d.kbli_description}` : '-';
 
   // Tahap badge
   const tahapEl = document.getElementById('tdm-badge-tahap');
@@ -2323,16 +2988,16 @@ async function loadCompetitionIntelligence(djangoId) {
 
     let winnerLine;
     if (winner.status === 'not_found') {
-      winnerLine = '<div class="text-[11px] text-slate-400">Winner data <span class="font-semibold text-slate-600">Not available</span></div>';
+      winnerLine = '<div class="text-[11px] text-slate-500">Data pemenang: <span class="font-semibold text-slate-700">Tidak tersedia</span></div>';
     } else if (winner.status === 'not_available' || winner.winner === null) {
-      winnerLine = '<div class="text-[11px] text-slate-400">Winner data <span class="font-semibold text-slate-600">Not available</span></div>';
+      winnerLine = '<div class="text-[11px] text-slate-500">Data pemenang: <span class="font-semibold text-slate-700">Tidak tersedia</span></div>';
     } else {
-      winnerLine = `<div class="text-[11px] text-slate-600">Winner: <span class="font-semibold text-slate-800">${esc(winner.winner.name || '—')}</span></div>`;
+      winnerLine = `<div class="text-[11px] text-slate-600">Pemenang: <span class="font-semibold text-slate-800">${esc(winner.winner.name || '—')}</span></div>`;
     }
 
     let valueLine = '';
     if (winner.status === 'ok' && winner.winner && winner.winner.contract_value) {
-      valueLine = `<div class="text-[11px] text-slate-600">Winning Value: <span class="font-semibold text-emerald-700">${esc(winner.winner.contract_value)}</span></div>`;
+      valueLine = `<div class="text-[11px] text-slate-600">Nilai Kontrak: <span class="font-semibold text-emerald-700">${esc(winner.winner.contract_value)}</span></div>`;
     }
 
     let participantLine;
@@ -2340,22 +3005,22 @@ async function loadCompetitionIntelligence(djangoId) {
       let namesHtml = '';
       if (Array.isArray(comp.participants) && comp.participants.length) {
         namesHtml = '<ul class="mt-1 space-y-0.5">' + comp.participants.map(p =>
-          `<li class="text-[11px] text-slate-600">• ${esc(p && p.name ? p.name : '—')}${(p && p.npwp) ? ` <span class="text-slate-400">(${esc(p.npwp)})</span>` : ''}</li>`
+          `<li class="text-[11px] text-slate-600">• ${esc(p && p.name ? p.name : '—')}${(p && p.npwp) ? ` <span class="text-slate-500">(${esc(p.npwp)})</span>` : ''}</li>`
         ).join('') + '</ul>';
       }
-      participantLine = `<div class="text-[11px] text-slate-600">Participants: <span class="font-semibold text-slate-800">${comp.participant_count}</span></div>${namesHtml}`;
+      participantLine = `<div class="text-[11px] text-slate-600">Jumlah Peserta: <span class="font-semibold text-slate-800">${comp.participant_count}</span></div>${namesHtml}`;
     } else {
-      participantLine = '<div class="text-[11px] text-slate-400">Participant data <span class="font-semibold text-slate-600">Not available</span></div>';
+      participantLine = '<div class="text-[11px] text-slate-500">Data peserta: <span class="font-semibold text-slate-700">Tidak tersedia</span></div>';
     }
 
-    const note = (comp.data_note) ? `<div class="text-[9px] text-slate-400 italic mt-1">${esc(comp.data_note)}</div>` : '';
+    const note = (comp.data_note) ? `<div class="text-[10px] text-slate-500 italic mt-1">${esc(comp.data_note)}</div>` : '';
     const limNote = (winner.data_limitation || comp.data_limitation)
-      ? `<div class="text-[9px] text-amber-600 italic mt-1">${esc(winner.data_limitation || comp.data_limitation)}</div>`
+      ? `<div class="text-[10px] text-amber-700 italic mt-1">${esc(winner.data_limitation || comp.data_limitation)}</div>`
       : '';
 
     content.innerHTML = '<div class="space-y-1">' + winnerLine + valueLine + participantLine + note + limNote + '</div>';
   } catch (e) {
-    content.innerHTML = '<div class="text-[11px] text-slate-400 italic">Gagal memuat data intelligence.</div>';
+    content.innerHTML = '<div class="text-[11px] text-slate-500 italic">Gagal memuat data intelijen kompetisi.</div>';
   }
 }
 
@@ -2440,7 +3105,7 @@ async function loadTdmSubmissionStatus(djangoId) {
   const badge = document.getElementById('tdm-badge-submission');
 
   try {
-    const resp = await fetch('/api/submission/?tender_id=' + djangoId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/submission/?tender_id=' + djangoId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (!resp.ok) return;
     const data = await resp.json();
     const items = data.items || [];
@@ -2486,7 +3151,7 @@ function renderSubmissionActions(djangoId, sub) {
 
 async function updateSubmission(djangoId, newStatus) {
   try {
-    const resp = await fetch('/api/submission/update/', {
+    const resp = await apiFetch('/api/submission/update/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({ tender_id: djangoId, status: newStatus }),
@@ -2506,16 +3171,27 @@ async function updateSubmission(djangoId, newStatus) {
 /* ===== WATCHLIST ===== */
 async function loadWatchlist() {
   try {
-    const resp = await fetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (!resp.ok) return;
     const data = await resp.json();
     const items = data.items || [];
     const container = document.getElementById('watchlist-list');
     const countEl = document.getElementById('watchlist-count');
-
     countEl.textContent = items.length;
+
+    attentionState.wlUrgent = items.filter(w => w.urgency === 'urgent').length;
+    attentionState.wlOverdue = items.filter(w => w.urgency === 'overdue').length;
+    renderAttentionBlock();
+
     if (items.length === 0) {
-      container.innerHTML = '<div class="text-[10px] text-slate-400 italic">Belum ada tender di-watchlist</div>';
+      container.innerHTML = renderEmptyState({
+        icon: 'bookmark',
+        title: 'Watchlist Masih Kosong',
+        reason: 'Simpan tender penting dari daftar untuk memantau jadwal dan batas waktu penawaran.',
+        ctaLabel: 'Cari Tender',
+        ctaAction: 'navigateToTenders()',
+        compact: true,
+      });
       return;
     }
     container.innerHTML = items.map(w => {
@@ -2566,7 +3242,7 @@ async function toggleWatchlist() {
   if (_tdmWatchlistId) {
     // Remove from watchlist
     try {
-      const resp = await fetch('/api/watchlist/remove/', {
+      const resp = await apiFetch('/api/watchlist/remove/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ watchlist_id: _tdmWatchlistId }),
@@ -2582,7 +3258,7 @@ async function toggleWatchlist() {
   } else {
     // Add to watchlist
     try {
-      const resp = await fetch('/api/watchlist/add/', {
+      const resp = await apiFetch('/api/watchlist/add/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ tender_id: _tdmCurrentId }),
@@ -2601,7 +3277,7 @@ async function toggleWatchlist() {
 
 async function removeWatchlistItem(watchlistId) {
   try {
-    await fetch('/api/watchlist/remove/', {
+    await apiFetch('/api/watchlist/remove/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({ watchlist_id: watchlistId }),
@@ -2614,7 +3290,7 @@ async function checkWatchlistStatus() {
   if (!_tdmCurrentId) return;
   _tdmWatchlistId = null;
   try {
-    const resp = await fetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/watchlist/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (!resp.ok) return;
     const data = await resp.json();
     const match = (data.items || []).find(w => w.tender_id === _tdmCurrentId);
@@ -2707,10 +3383,37 @@ function renderOpportunityScore(data) {
     explanationHtml;
 }
 
+/* ===== PERLU PERHATIAN (UX-007) ===== */
+const attentionState = { urgent3: 0, urgent7: 0, wlUrgent: 0, wlOverdue: 0 };
+
+function renderAttentionBlock() {
+  const block = document.getElementById('attention-block');
+  const holder = document.getElementById('attention-items');
+  if (!block || !holder) return;
+  const chips = [];
+  if (attentionState.wlOverdue > 0) {
+    chips.push('<button onclick="document.getElementById(\'watchlist-list\').scrollIntoView({behavior:\'smooth\'})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors">' + attentionState.wlOverdue + ' tender di watchlist sudah lewat deadline</button>');
+  }
+  if (attentionState.urgent3 > 0) {
+    chips.push('<button onclick="document.getElementById(\'radar-section\').scrollIntoView({behavior:\'smooth\'})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors">' + attentionState.urgent3 + ' tender deadline &lt;3 hari</button>');
+  } else if (attentionState.urgent7 > 0) {
+    chips.push('<button onclick="document.getElementById(\'radar-section\').scrollIntoView({behavior:\'smooth\'})" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">' + attentionState.urgent7 + ' tender deadline &lt;7 hari</button>');
+  }
+  if (attentionState.wlUrgent > 0) {
+    chips.push('<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">' + attentionState.wlUrgent + ' tender watchlist mendesak</span>');
+  }
+  if (chips.length === 0) {
+    block.classList.add('hidden');
+    return;
+  }
+  holder.innerHTML = chips.join('');
+  block.classList.remove('hidden');
+}
+
 /* ===== PIPELINE SUMMARY ===== */
 async function loadPipelineSummary() {
   try {
-    const resp = await fetch('/api/pipeline/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch('/api/pipeline/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (!resp.ok) return;
     const data = await resp.json();
     document.getElementById('pipe-belum').textContent = (data.belum_diproses || 0);
@@ -2734,13 +3437,18 @@ async function loadPipelineSummary() {
         urgEl.classList.add('hidden');
       }
     }
+    attentionState.urgent3 = urg.deadline_under_3_days || 0;
+    attentionState.urgent7 = urg.deadline_under_7_days || 0;
+    renderAttentionBlock();
   } catch (e) { /* silent */ }
 }
 
 /* ===== RECOMMENDED TENDERS ===== */
 async function fetchRecommended() {
   const tbody = document.getElementById('results-body');
-  tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center"><span class="text-xs text-slate-400">Memuat rekomendasi...</span></td></tr>';
+  const cardsContainer = document.getElementById('results-cards-mobile');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center"><span class="text-xs text-slate-400">Memuat rekomendasi...</span></td></tr>';
+  if (cardsContainer) cardsContainer.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">Memuat rekomendasi...</div>';
 
   try {
     const resp = await fetch('/api/recommended/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -2751,56 +3459,88 @@ async function fetchRecommended() {
     document.getElementById('total-count-sidebar').textContent = items.length.toLocaleString('id-ID');
 
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-16 text-center text-slate-400"><div class="text-xs">Tidak ada rekomendasi. Lengkapi profil perusahaan dan KBLI.</div></td></tr>';
+      if (tbody) {
+        tbody.innerHTML = renderEmptyState({
+          icon: 'sparkles',
+          title: 'Belum Ada Rekomendasi Tender',
+          reason: 'Rekomendasi dihitung berdasarkan kecocokan profil perusahaan dan KBLI aktif. Lengkapi profil perusahaan untuk melihat rekomendasi tender terbaik.',
+          ctaLabel: 'Lengkapi Profil Perusahaan',
+          ctaAction: 'openCompanyModal()',
+          colspan: 10,
+        });
+      }
+      if (cardsContainer) {
+        cardsContainer.innerHTML = renderEmptyState({
+          icon: 'sparkles',
+          title: 'Belum Ada Rekomendasi Tender',
+          reason: 'Rekomendasi dihitung berdasarkan kecocokan profil perusahaan dan KBLI aktif. Lengkapi profil perusahaan untuk melihat rekomendasi tender terbaik.',
+          ctaLabel: 'Lengkapi Profil Perusahaan',
+          ctaAction: 'openCompanyModal()',
+        });
+      }
       return;
     }
 
-    tbody.innerHTML = items.map(r => {
-      const tahapBadge = getTahapBadge(r.tahap_saat_ini, false);
-      const itBadge = r.is_it_priority
-        ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1">🔥 IT</span>'
-        : '';
-      const recColor = (r.opportunity_score || 0) >= 90 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-        : (r.opportunity_score || 0) >= 75 ? 'text-blue-700 bg-blue-50 border-blue-200'
-        : (r.opportunity_score || 0) >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
-        : 'text-red-700 bg-red-50 border-red-200';
-      const reasonStr = r.reason ? '<div class="text-[9px] text-slate-400 mt-0.5 italic">' + esc(r.reason) + '</div>' : '';
-      const strengthStr = (r.strengths || []).length
-        ? '<div class="text-[8px] text-emerald-600 mt-0.5">' + r.strengths.slice(0, 2).map(s => '✓ ' + esc(s)).join(' · ') + '</div>'
-        : '';
+    if (tbody) {
+      tbody.innerHTML = items.map(r => {
+        const tahapBadge = getTahapBadge(r.tahap_saat_ini, false);
+        const itBadge = r.is_it_priority
+          ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1">🔥 IT</span>'
+          : '';
+        const recColor = (r.opportunity_score || 0) >= 90 ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+          : (r.opportunity_score || 0) >= 75 ? 'text-blue-700 bg-blue-50 border-blue-200'
+          : (r.opportunity_score || 0) >= 60 ? 'text-amber-700 bg-amber-50 border-amber-200'
+          : 'text-red-700 bg-red-50 border-red-200';
+        const reasonStr = r.reason ? '<div class="text-[9px] text-slate-400 mt-0.5 italic">' + esc(r.reason) + '</div>' : '';
+        const strengthStr = (r.strengths || []).length
+          ? '<div class="text-[8px] text-emerald-600 mt-0.5">' + r.strengths.slice(0, 2).map(s => '✓ ' + esc(s)).join(' · ') + '</div>'
+          : '';
 
-      return '<tr class="hover:bg-blue-50/40 transition-colors fade-in">' +
-        '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left">' + esc(r.id_lelang || String(r.id)) + '</button></td>' +
-        '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="text-left w-full cursor-pointer"><div class="text-xs font-semibold text-slate-800 leading-snug">' + esc(r.nama_paket) + itBadge + '</div><div class="text-[10px] text-slate-400 mt-0.5">' + esc(r.instansi) + '</div>' + reasonStr + strengthStr + '</button></td>' +
-        '<td class="px-4 py-3 text-xs text-slate-600">' + esc(r.instansi) + '</td>' +
-        '<td class="px-4 py-3">' + tahapBadge + '</td>' +
-        '<td class="px-4 py-3 text-center"><span class="text-slate-300 text-[10px]">&mdash;</span></td>' +
-        '<td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">&mdash;</td>' +
-        '<td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700">' + esc(r.hps_short) + '</td>' +
-        '<td class="px-4 py-3 text-center">' + renderPersistedAiScore(r) + '</td>' +
-        '<td class="px-4 py-3 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + recColor + '">' + (r.opportunity_score || 0) + '% ' + esc(r.recommendation) + '</span></td>' +
-      '</tr>';
-    }).join('');
+        return '<tr class="hover:bg-blue-50/40 transition-colors fade-in">' +
+          '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="font-mono text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer text-left">' + esc(r.id_lelang || String(r.id)) + '</button></td>' +
+          '<td class="px-4 py-3"><button onclick="openTenderDetail(' + r.id + ')" class="text-left w-full cursor-pointer"><div class="text-xs font-semibold text-slate-800 leading-snug">' + esc(r.nama_paket) + itBadge + '</div><div class="text-[10px] text-slate-400 mt-0.5">' + esc(r.instansi) + '</div>' + reasonStr + strengthStr + '</button></td>' +
+          '<td class="px-4 py-3 text-xs text-slate-600">' + esc(r.instansi) + '</td>' +
+          '<td class="px-4 py-3">' + tahapBadge + '</td>' +
+          '<td class="px-4 py-3 text-center"><span class="text-slate-300 text-[10px]">&mdash;</span></td>' +
+          '<td class="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">&mdash;</td>' +
+          '<td class="px-4 py-3 text-right font-mono text-[11px] font-semibold text-slate-700">' + esc(r.hps_short) + '</td>' +
+          '<td class="px-4 py-3 text-center">' + renderPersistedAiScore(r) + '</td>' +
+          '<td class="px-4 py-3 text-center"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ' + recColor + '">' + (r.opportunity_score || 0) + '% ' + esc(r.recommendation) + '</span></td>' +
+          '<td class="px-4 py-3"></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    if (cardsContainer) {
+      cardsContainer.innerHTML = items.map(renderMobileRecommendedCard).join('');
+    }
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-red-400 text-xs">Gagal memuat rekomendasi</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-red-400 text-xs">Gagal memuat rekomendasi</td></tr>';
+    if (cardsContainer) cardsContainer.innerHTML = '<div class="p-6 text-center text-red-400 text-xs">Gagal memuat rekomendasi</div>';
   }
 }
 
 /* ===== TENDER RADAR ===== */
-let radarState = { active: 'all', expanded: false };
+// Expanded by default (UX-007) unless the user collapsed it previously.
+let radarState = { active: 'all', expanded: localStorage.getItem('radarCollapsed') !== '1', limit: 5 };
 
-function toggleRadar() {
-  radarState.expanded = !radarState.expanded;
+function applyRadarExpanded() {
   const body = document.getElementById('radar-body');
   const chevron = document.getElementById('radar-chevron');
   if (radarState.expanded) {
     body.classList.remove('hidden');
     chevron.style.transform = 'rotate(180deg)';
-    if (!radarState.loaded) loadRadar(radarState.active);
   } else {
     body.classList.add('hidden');
     chevron.style.transform = '';
   }
+}
+
+function toggleRadar() {
+  radarState.expanded = !radarState.expanded;
+  localStorage.setItem('radarCollapsed', radarState.expanded ? '0' : '1');
+  applyRadarExpanded();
+  if (radarState.expanded && !radarState.loaded) loadRadar(radarState.active);
 }
 
 function setRadarFilterBtn(active) {
@@ -2814,15 +3554,18 @@ function setRadarFilterBtn(active) {
   });
 }
 
-async function loadRadar(classification) {
+async function loadRadar(classification, limit) {
   radarState.active = classification || 'all';
+  if (limit) radarState.limit = limit;
   setRadarFilterBtn(radarState.active);
   radarState.loaded = true;
   const container = document.getElementById('radar-results');
   const loading = document.getElementById('radar-loading');
   const countEl = document.getElementById('radar-count');
   const subEl = document.getElementById('radar-subtitle');
+  const moreEl = document.getElementById('radar-more');
   loading.classList.remove('hidden');
+  moreEl.classList.add('hidden');
   container.innerHTML = '';
 
   try {
@@ -2830,14 +3573,20 @@ async function loadRadar(classification) {
     if (classification && classification !== 'all') {
       url += '&classification=' + encodeURIComponent(classification);
     }
-    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     const data = await resp.json();
     loading.classList.add('hidden');
 
     if (data.status === 'empty') {
       countEl.textContent = '0';
       subEl.textContent = ('error' in data ? data.error : 'Belum ada peluang.');
-      container.innerHTML = '<div class="text-[11px] text-slate-400 italic py-3">' + esc(data.error || 'Lengkapi profil perusahaan untuk mendapatkan rekomendasi tender.') + '</div>';
+      container.innerHTML = renderEmptyState({
+        icon: 'radar',
+        title: 'Radar Belum Memiliki Data',
+        reason: data.error || 'Lengkapi profil dan kualifikasi perusahaan Anda untuk mengaktifkan pemindaian tender otomatis.',
+        ctaLabel: 'Lengkapi Profil Perusahaan',
+        ctaAction: 'openCompanyModal()',
+      });
       return;
     }
 
@@ -2845,17 +3594,30 @@ async function loadRadar(classification) {
     countEl.textContent = data.total || items.length;
 
     if (items.length === 0) {
-      subEl.textContent = classification && classification !== 'all'
+      const isFiltered = classification && classification !== 'all';
+      subEl.textContent = isFiltered
         ? 'Tidak ada peluang untuk filter ini.'
         : 'Belum ada peluang yang sesuai dengan profil perusahaan Anda.';
-      container.innerHTML = '<div class="text-[11px] text-slate-400 italic py-3">' +
-        (classification && classification !== 'all' ? 'Tidak ada peluang pada kategori ini.' : 'Belum ada peluang yang sesuai dengan profil perusahaan Anda.') + '</div>';
+      container.innerHTML = renderEmptyState({
+        icon: 'radar',
+        title: isFiltered ? 'Tidak Ada Peluang di Kategori Ini' : 'Belum Ada Peluang Sesuai',
+        reason: isFiltered
+          ? 'Tidak ditemukan tender aktif pada kategori ini yang memenuhi ambang batas skor.'
+          : 'Belum ada tender aktif yang cocok dengan parameter kualifikasi perusahaan Anda.',
+        ctaLabel: 'Periksa Profil Perusahaan',
+        ctaAction: 'openCompanyModal()',
+      });
       return;
     }
 
     subEl.textContent = data.total + ' peluang cocok untuk perusahaan Anda';
 
-    container.innerHTML = items.map(r => radarCard(r)).join('');
+    const visible = items.slice(0, radarState.limit);
+    container.innerHTML = visible.map(r => radarCard(r)).join('');
+    if (items.length > visible.length) {
+      moreEl.classList.remove('hidden');
+      moreEl.querySelector('button').textContent = 'Lihat semua ' + (data.total || items.length) + ' peluang';
+    }
   } catch (e) {
     loading.classList.add('hidden');
     countEl.textContent = '0';
@@ -2867,48 +3629,86 @@ function radarCard(r) {
   const ai = r.ai_match || {};
   const opp = r.opportunity || {};
   const oppScore = opp.score || 0;
-  let oppColor = 'text-red-700 bg-red-50 border-red-200';
-  if (oppScore >= 90) oppColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  else if (oppScore >= 75) oppColor = 'text-blue-700 bg-blue-50 border-blue-200';
-  else if (oppScore >= 60) oppColor = 'text-amber-700 bg-amber-50 border-amber-200';
-
   const aiScore = ai.fit_score || 0;
-  let aiColor = 'text-red-700 bg-red-50 border-red-200';
-  if (aiScore >= 71) aiColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  else if (aiScore >= 41) aiColor = 'text-amber-700 bg-amber-50 border-amber-200';
 
-  const itBadge = r.is_it_priority ? '<span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200">🔥 IT</span>' : '';
+  // Match label: status + score in words, not a bare number
+  let matchBadge;
+  if (r.radar_status === 'NOT_READY') {
+    matchBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-slate-50 text-slate-500 border-slate-200">Belum dianalisis</span>';
+  } else if (aiScore >= 71) {
+    matchBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">✓ Layak ' + aiScore + '%</span>';
+  } else if (aiScore >= 41) {
+    matchBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-amber-50 text-amber-700 border-amber-200">Bersyarat ' + aiScore + '%</span>';
+  } else {
+    matchBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-red-50 text-red-700 border-red-200">Rendah ' + aiScore + '%</span>';
+  }
+
+  let oppBadge = '';
+  if (r.radar_status !== 'NOT_READY') {
+    let oppColor = 'bg-red-50 text-red-700 border-red-200';
+    if (oppScore >= 90) oppColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    else if (oppScore >= 75) oppColor = 'bg-blue-50 text-blue-700 border-blue-200';
+    else if (oppScore >= 60) oppColor = 'bg-amber-50 text-amber-700 border-amber-200';
+    oppBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ' + oppColor + '" title="Skor Peluang">Peluang ' + oppScore + '</span>';
+  }
+
+  const itBadge = r.is_it_priority ? '<span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-violet-100 text-violet-700 border border-violet-200 ml-1">IT</span>' : '';
   const hpsStr = formatHpsRadar(r.hps);
 
-  const deadlineStr = r.deadline_days_left != null
-    ? (r.deadline_days_left < 0 ? 'Deadline lewat' : (r.deadline_days_left === 0 ? 'Deadline hari ini' : (r.deadline_days_left + ' hari lagi')))
-    : 'Deadline tidak diketahui';
-
-  let aiHtml, oppHtml;
-  if (r.radar_status === 'NOT_READY') {
-    aiHtml = '<div class="text-[9px] text-slate-400 italic">Belum dianalisis AI.</div>';
-    oppHtml = '<div class="text-[9px] text-amber-700 italic">NOT READY — jalankan AI Match</div>';
+  // Deadline with urgency emphasis
+  let deadlineHtml;
+  if (r.deadline_days_left == null) {
+    deadlineHtml = '<span class="text-[10px] text-slate-400">Deadline tidak diketahui</span>';
+  } else if (r.deadline_days_left < 0) {
+    deadlineHtml = '<span class="text-[10px] font-semibold text-red-600">Deadline lewat</span>';
+  } else if (r.deadline_days_left <= 3) {
+    deadlineHtml = '<span class="text-[10px] font-semibold text-red-600">' + (r.deadline_days_left === 0 ? 'Deadline hari ini' : r.deadline_days_left + ' hari lagi') + '</span>';
+  } else if (r.deadline_days_left <= 7) {
+    deadlineHtml = '<span class="text-[10px] font-semibold text-amber-600">' + r.deadline_days_left + ' hari lagi</span>';
   } else {
-    aiHtml = '<div><span class="text-[9px] font-semibold text-slate-500">AI FIT</span><div class="text-[10px] ' + aiColor.split(' ')[0] + ' font-bold">' + aiScore + '/100</div></div>';
-    oppHtml = '<div><span class="text-[9px] font-semibold text-slate-500">OPPORTUNITY</span><div class="text-[10px] ' + oppColor.split(' ')[0] + ' font-bold">' + oppScore + '/100</div><div class="text-[8px] text-slate-400">' + esc((opp.classification || '').replace(/_/g, ' ')) + '</div></div>';
+    deadlineHtml = '<span class="text-[10px] text-slate-500">' + r.deadline_days_left + ' hari lagi</span>';
   }
+
+  // One-line reason: prefer opportunity explanation, fallback to AI summary
+  const reasonSrc = (opp.explanation && opp.explanation.length) ? opp.explanation[0] : (ai.summary || '');
+  const reasonHtml = reasonSrc
+    ? '<div class="text-[10px] text-slate-500 mt-1 leading-snug line-clamp-2">' + esc(reasonSrc) + '</div>'
+    : (r.radar_status === 'NOT_READY' ? '<div class="text-[10px] text-slate-400 italic mt-1">Jalankan Analisis Kecocokan untuk melihat alasan.</div>' : '');
 
   return '<div class="border border-slate-200 rounded-lg p-3 hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors">' +
     '<div class="flex items-start justify-between gap-3">' +
-      '<div class="min-w-0">' +
+      '<div class="min-w-0 flex-1">' +
         '<button onclick="openTenderDetail(' + r.tender_id + ')" class="text-left text-xs font-semibold text-slate-800 hover:text-blue-600 cursor-pointer leading-snug">' + esc(r.title) + itBadge + '</button>' +
         '<div class="text-[10px] text-slate-400 mt-0.5">' + esc(r.instansi || '') + (r.location ? ' · ' + esc(r.location) : '') + '</div>' +
-        '<div class="flex items-center gap-2 mt-1.5">' +
+        '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
           '<span class="text-[10px] font-mono font-semibold text-slate-700">' + hpsStr + '</span>' +
-          '<span class="text-[9px] text-slate-400">' + deadlineStr + '</span>' +
+          deadlineHtml + matchBadge + oppBadge +
         '</div>' +
+        reasonHtml +
       '</div>' +
-      '<div class="flex items-center gap-3 flex-shrink-0">' +
-        aiHtml + oppHtml +
-        '<button onclick="openTenderDetail(' + r.tender_id + ')" class="px-2 py-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">Lihat</button>' +
+      '<div class="flex flex-col items-end gap-1.5 flex-shrink-0">' +
+        '<button onclick="openTenderDetail(' + r.tender_id + ')" class="px-2.5 py-1 text-[10px] font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">Detail</button>' +
+        '<button onclick="addRadarToWatchlist(' + r.tender_id + ', this)" class="px-2.5 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">Simpan</button>' +
       '</div>' +
     '</div>' +
   '</div>';
+}
+
+async function addRadarToWatchlist(tenderId, btn) {
+  try {
+    const resp = await apiFetch('/api/watchlist/add/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ tender_id: tenderId }),
+    });
+    const data = await resp.json();
+    if (data.status === 'success' || data.status === 'exists') {
+      btn.textContent = 'Tersimpan';
+      btn.disabled = true;
+      btn.className = 'px-2.5 py-1 text-[10px] font-medium text-amber-800 bg-amber-100 border border-amber-300 rounded-lg cursor-default';
+      loadWatchlist();
+    }
+  } catch (e) { /* apiFetch already toasts */ }
 }
 
 function formatHpsRadar(hps) {
@@ -2948,13 +3748,13 @@ async function loadIntelligenceStatus() {
       NOT_READY: 'bg-red-50 text-red-700 border-red-200',
       EMPTY: 'bg-slate-50 text-slate-500 border-slate-200'
     };
-    const levelLabels = { READY: 'READY', PARTIAL: 'PARTIAL', NOT_READY: 'NOT READY', EMPTY: 'EMPTY' };
+    const levelLabels = { READY: 'SIAP', PARTIAL: 'SEBAGIAN', NOT_READY: 'BELUM SIAP', EMPTY: 'KOSONG' };
 
     if (data.status === 'empty') {
-      chip.textContent = 'EMPTY';
+      chip.textContent = 'KOSONG';
       chip.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ' + levelStyles.EMPTY;
       readyText.textContent = 'Lengkapi profil perusahaan untuk menilai kesiapan intelligence.';
-      readyText.className = 'text-[10px] text-slate-400';
+      readyText.className = 'text-[10px] text-slate-500';
       return;
     }
 
@@ -2966,30 +3766,89 @@ async function loadIntelligenceStatus() {
     readyText.className = 'text-[10px] text-slate-500';
   } catch (e) {
     const chip = document.getElementById('intel-readiness-chip');
-    chip.textContent = 'ERROR';
+    chip.textContent = 'GAGAL';
     chip.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-red-50 text-red-700 border-red-200';
   }
 }
 
-function toggleMobileSidebar() {
-  let overlay = document.getElementById('mobile-sidebar-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'mobile-sidebar-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.4);display:flex;';
-    overlay.onclick = function(e) { if (e.target === overlay) toggleMobileSidebar(); };
-    const panel = document.querySelector('.sidebar-desktop').cloneNode(true);
-    panel.className = 'w-72 bg-white border-r border-slate-200 flex flex-col h-full overflow-y-auto';
-    panel.style.cssText = 'flex-shrink:0;';
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
+function toggleMobileSidebar(forceState) {
+  const sidebar = document.getElementById('app-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const btn = document.getElementById('mobile-filter-btn');
+  if (!sidebar) return;
+
+  const shouldOpen = typeof forceState === 'boolean'
+    ? forceState
+    : !sidebar.classList.contains('mobile-open');
+
+  if (shouldOpen) {
+    sidebar.classList.add('mobile-open');
+    sidebar.setAttribute('aria-hidden', 'false');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    if (backdrop) backdrop.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
   } else {
-    overlay.remove();
+    sidebar.classList.remove('mobile-open');
+    sidebar.setAttribute('aria-hidden', 'true');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    if (backdrop) backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
   }
 }
 
+// Global hierarchical Escape key handler
+function handleEscapeKey(e) {
+  if (e.key !== 'Escape') return;
+
+  // 1. AI Modal (dynamic overlay)
+  const aiModal = document.getElementById('ai-modal') || document.querySelector('[onclick*="closeAiModal"]');
+  if (aiModal && !aiModal.classList.contains('hidden')) {
+    closeAiModal();
+    return;
+  }
+
+  // 2. Tender Detail Modal
+  const tdm = document.getElementById('tender-detail-modal');
+  if (tdm && !tdm.classList.contains('hidden')) {
+    closeTenderDetailModal();
+    return;
+  }
+
+  // 3. Company Modal
+  const compModal = document.getElementById('company-modal');
+  if (compModal && !compModal.classList.contains('hidden')) {
+    closeCompanyModal();
+    return;
+  }
+
+  // 4. KBLI Modal
+  const kbliModal = document.getElementById('kbli-modal');
+  if (kbliModal && !kbliModal.classList.contains('hidden')) {
+    closeKbliModal();
+    return;
+  }
+
+  // 5. Flush Modal
+  const flushModal = document.getElementById('flush-modal');
+  if (flushModal && !flushModal.classList.contains('hidden')) {
+    closeFlushModal();
+    return;
+  }
+
+  // 6. Mobile Sidebar drawer
+  const sidebar = document.getElementById('app-sidebar');
+  if (sidebar && sidebar.classList.contains('mobile-open')) {
+    toggleMobileSidebar(false);
+    return;
+  }
+}
+document.addEventListener('keydown', handleEscapeKey);
+
 /* ===== INIT ===== */
 applyFilters();
+if (IS_AUTHENTICATED) {
+  loadCompanyData();
+}
 setInterval(fetchResults, 15000);
 setInterval(fetchFilterCounts, 30000);
 setInterval(fetchMonitorProgress, 3000);
@@ -3000,6 +3859,7 @@ loadPipelineSummary();
 setInterval(loadWatchlist, 60000);
 setInterval(loadPipelineSummary, 60000);
 loadRadar('all');
+applyRadarExpanded();
 loadIntelligenceStatus();
 setInterval(loadIntelligenceStatus, 30000);
 </script>
