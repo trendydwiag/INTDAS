@@ -2,7 +2,6 @@ import json
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
-from django.views.decorators.csrf import csrf_exempt
 
 from .models import CompanyProfile, CompanyQualification
 
@@ -56,7 +55,6 @@ def api_company_list(request):
 
 
 @require_POST
-@csrf_exempt
 def api_company_create(request):
     """Create a new company profile. Only superadmin."""
     err = _require_auth(request)
@@ -91,7 +89,6 @@ def api_company_create(request):
 
 
 @require_POST
-@csrf_exempt
 def api_company_update(request, company_id):
     """Update an existing company profile."""
     err = _require_auth(request)
@@ -175,7 +172,6 @@ def api_qualification_list(request, company_id):
 
 
 @require_POST
-@csrf_exempt
 def api_qualification_create(request, company_id):
     """Create a new qualification for a company."""
     err = _require_auth(request)
@@ -229,7 +225,6 @@ def api_qualification_create(request, company_id):
 
 
 @require_POST
-@csrf_exempt
 def api_qualification_update(request, company_id, qual_id):
     """Update a qualification."""
     err = _require_auth(request)
@@ -266,7 +261,6 @@ def api_qualification_update(request, company_id, qual_id):
 
 
 @require_POST
-@csrf_exempt
 def api_qualification_delete(request, company_id, qual_id):
     """Delete a qualification."""
     err = _require_auth(request)

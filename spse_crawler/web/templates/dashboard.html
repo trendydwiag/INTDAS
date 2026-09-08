@@ -71,6 +71,7 @@
   </style>
 </head>
 <body class="h-full overflow-hidden">
+<div class="hidden" aria-hidden="true">{% csrf_token %}</div>
 
 <div class="flex h-full">
 
@@ -1165,6 +1166,13 @@ const state = {
 
 const csrftoken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 
+function getCsrfToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+    || document.cookie.match(/csrftoken=([^;]+)/)?.[1]
+    || csrftoken
+    || '';
+}
+
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1289,14 +1297,28 @@ function _handleSessionExpired() {
   }, 1500);
 }
 
-async function apiFetch(url, opts) {
+async function apiFetch(url, opts = {}) {
   if (_sessionExpired) {
     // Stop polling traffic after session expiry
     return new Response(null, { status: 401, statusText: 'session expired' });
   }
+
+  const method = (opts.method || 'GET').toUpperCase();
+  const headers = new Headers(opts.headers || {});
+  if (!headers.has('X-Requested-With')) {
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+  }
+  if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+    const token = getCsrfToken();
+    if (token && !headers.has('X-CSRFToken')) {
+      headers.set('X-CSRFToken', token);
+    }
+  }
+
+  const mergedOpts = { ...opts, headers };
   let resp;
   try {
-    resp = await fetch(url, opts);
+    resp = await fetch(url, mergedOpts);
   } catch (e) {
     showToast('Koneksi ke server gagal. Periksa jaringan Anda.', 'error');
     throw e;
@@ -2498,9 +2520,9 @@ async function createCompanyProfile() {
   if (!name || !nib) { alert('Nama dan NIB wajib diisi'); return; }
 
   try {
-    const resp = await fetch('/api/company/create/', {
+    const resp = await apiFetch('/api/company/create/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, nib }),
     });
     const data = await resp.json();
@@ -2536,9 +2558,9 @@ async function saveCompanyProfile() {
   };
 
   try {
-    const resp = await fetch(`/api/company/${_companyId}/update/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/update/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await resp.json();
@@ -2556,7 +2578,7 @@ async function saveCompanyProfile() {
 
 async function loadQualifications(companyId) {
   try {
-    const resp = await fetch(`/api/company/${companyId}/qualifications/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch(`/api/company/${companyId}/qualifications/`);
     const data = await resp.json();
     _qualifications = data.items || [];
 
@@ -2724,9 +2746,9 @@ async function saveQualification() {
   }
 
   try {
-    const resp = await fetch(`/api/company/${_companyId}/qualifications/create/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/qualifications/create/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await resp.json();
@@ -2745,9 +2767,8 @@ async function saveQualification() {
 async function deleteQualification(qualId) {
   if (!confirm('Hapus kualifikasi ini?')) return;
   try {
-    const resp = await fetch(`/api/company/${_companyId}/qualifications/${qualId}/delete/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/qualifications/${qualId}/delete/`, {
       method: 'POST',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
     const data = await resp.json();
     if (data.status === 'success') {
@@ -2773,9 +2794,9 @@ async function runAiMatch(tenderId, tenderCode) {
   setStatusText('<span class="text-[10px] text-blue-500">Analyzing...</span>');
 
   try {
-    const resp = await fetch('/api/match/run/', {
+    const resp = await apiFetch('/api/match/run/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tender_id: tenderId, force: true }),
     });
     const data = await resp.json();
@@ -3032,9 +3053,9 @@ async function runAiMatchFromModal() {
   content.innerHTML = '<span class="text-[11px] text-blue-500">Analyzing...</span>';
   document.getElementById('tdm-ai-section').classList.remove('hidden');
   try {
-    const resp = await fetch('/api/match/run/', {
+    const resp = await apiFetch('/api/match/run/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tender_id: _tdmCurrentId, force: true }),
     });
     const data = await resp.json();

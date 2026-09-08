@@ -20,7 +20,6 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone as dj_timezone
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from spse_crawler.config.settings import INSTANSI_CODES, InstansiConfig, get_settings
@@ -1268,7 +1267,6 @@ def api_watchlist_list(request):
 
 
 @require_POST
-@csrf_exempt
 def api_watchlist_add(request):
     """Add a tender to watchlist."""
     user = getattr(request, "user", None)
@@ -1306,7 +1304,6 @@ def api_watchlist_add(request):
 
 
 @require_POST
-@csrf_exempt
 def api_watchlist_remove(request):
     """Remove a tender from watchlist."""
     user = getattr(request, "user", None)
