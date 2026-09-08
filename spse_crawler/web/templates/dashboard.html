@@ -883,7 +883,9 @@
             <div>
               <label class="block text-[10px] text-slate-600 mb-0.5">Kategori *</label>
               <select id="qf-category" class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-200" onchange="onQualCategoryChange()">
-                <option value="izin_usaha">Izin Usaha / SBU / Sertifikasi</option>
+                <option value="izin_usaha">Izin Usaha (NIB, SIUP, dll)</option>
+                <option value="sbu">SBU (Sertifikat Badan Usaha)</option>
+                <option value="sertifikasi">Sertifikasi (KADIN, ISO, dll)</option>
                 <option value="pengalaman_kerja">Pengalaman Kerja</option>
                 <option value="sdm">SDM (Personil)</option>
               </select>
@@ -2650,7 +2652,7 @@ let _qfKbliCodes = [];
 function onQualCategoryChange() {
   const cat = document.getElementById('qf-category').value;
   document.querySelectorAll('.dyn-fields').forEach(el => el.classList.add('hidden'));
-  if (cat === 'izin_usaha') {
+  if (cat === 'izin_usaha' || cat === 'sbu' || cat === 'sertifikasi') {
     document.getElementById('qf-fields-izin').classList.remove('hidden');
   } else if (cat === 'pengalaman_kerja') {
     document.getElementById('qf-fields-pengalaman').classList.remove('hidden');
@@ -2699,7 +2701,7 @@ async function saveQualification() {
 
   if (!body.name) { alert('Nama kualifikasi wajib diisi'); return; }
 
-  if (category === 'izin_usaha') {
+  if (category === 'izin_usaha' || category === 'sbu' || category === 'sertifikasi') {
     body.number = document.getElementById('qf-number').value.trim();
     body.klasifikasi_usaha = document.getElementById('qf-klasifikasi').value;
     body.value_amount = parseInt(document.getElementById('qf-value').value) || 0;
