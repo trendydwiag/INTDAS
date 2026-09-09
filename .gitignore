@@ -39,6 +39,8 @@ Thumbs.db
 data/exports/*.csv
 data/exports/*.xlsx
 data/logs/
+data/*.json
+data/*.tmp*
 
 # Playwright
 .playwright/
