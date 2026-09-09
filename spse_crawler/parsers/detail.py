@@ -290,7 +290,7 @@ class DetailParser:
         "rekomendasi",
     )
 
-    # Keywords that mark a package as ELIGIBLE (active prakualifikasi).
+    # Keywords that mark a package as ELIGIBLE (active prakualifikasi & pemilihan).
     _TAHAP_ACCEPT_KEYWORDS: tuple[str, ...] = (
         "prakualifikasi",
         "pengumuman prakualifikasi",
@@ -303,6 +303,12 @@ class DetailParser:
         "jawaban",
         "negosiasi",
         "survey",
+        "dokumen pemilihan",
+        "pemilihan",
+        "download dokumen",
+        "pemberian penjelasan",
+        "upload dokumen",
+        "sanggah",
     )
 
     @classmethod
@@ -501,25 +507,66 @@ class DetailParser:
         count, _ = await self._fetch_peserta_data(url, referer, kode_instansi)
         return count
 
+    @staticmethod
+    def _build_evaluasi_hasil_url(url: str) -> str:
+        """Build the verified /evaluasi/{id}/hasil URL."""
+        if not url:
+            return ""
+        m = re.match(r"(https?://[^/]+/[^/]+)/lelang/([^/]+)/pengumumanlelang", url)
+        if not m:
+            return ""
+        return f"{m.group(1)}/evaluasi/{m.group(2)}/hasil"
+
     async def _fetch_peserta_data(
         self, url: str, referer: str, kode_instansi: str
     ) -> tuple[int, list[dict]]:
-        """Fetch the /peserta page once and return (count, participants).
+        """Fetch both the /peserta page and /evaluasi/{id}/hasil page once and return (count, participants).
 
-        ``participants`` is a list of ``{"name": str, "npwp": str}`` dicts read
-        from the table rows. Falls back to ``(0, [])`` when the page cannot be
-        fetched. Reserved for later winner enrichment; the page is fetched a
-        single time, never twice.
+        ``participants`` is a list of ``{"name": str, "npwp": str, "alasan": str, "nilai": str}`` dicts.
+        Captures evaluation failure notes (e.g. 'Tidak lulus hasil evaluasi unsur pengalaman perusahaan')
+        from the evaluation results tab.
         """
         peserta_url = url.replace("/pengumumanlelang", "/peserta")
+        hasil_url = self._build_evaluasi_hasil_url(url)
+
+        participants_dict: dict[str, dict] = {}
+        count = 0
+
+        # 1. Fetch /peserta
         html = await self._fetch_html_httpx(peserta_url, referer=referer, kode_instansi=kode_instansi)
         if html is None:
             await self._ensure_playwright()
             if self._pw is not None:
                 html = await self._fetch_html_playwright(peserta_url, kode_instansi)
-        if html is None:
-            return 0, []
-        return self._parse_peserta_count(html), self._parse_participants(html)
+        if html:
+            count = self._parse_peserta_count(html)
+            for p in self._parse_participants(html):
+                key = re.sub(r"[^\w\s]", "", p["name"].lower()).strip()
+                participants_dict[key] = p
+
+        # 2. Fetch /evaluasi/{id}/hasil (for evaluation reasons, scores, etc.)
+        if hasil_url:
+            html_hasil = await self._fetch_html_httpx(hasil_url, referer=referer, kode_instansi=kode_instansi)
+            if html_hasil is None:
+                await self._ensure_playwright()
+                if self._pw is not None:
+                    html_hasil = await self._fetch_html_playwright(hasil_url, kode_instansi)
+            if html_hasil:
+                for p in self._parse_participants_from_evaluasi(html_hasil):
+                    key = re.sub(r"[^\w\s]", "", p["name"].lower()).strip()
+                    if key in participants_dict:
+                        if p.get("alasan"):
+                            participants_dict[key]["alasan"] = p["alasan"]
+                        if p.get("nilai"):
+                            participants_dict[key]["nilai"] = p["nilai"]
+                        if p.get("npwp") and not participants_dict[key].get("npwp"):
+                            participants_dict[key]["npwp"] = p["npwp"]
+                    else:
+                        participants_dict[key] = p
+                if count == 0:
+                    count = len(participants_dict)
+
+        return max(count, len(participants_dict)), list(participants_dict.values())
 
     def _parse_peserta_count(self, html: str) -> int:
         """Count participants from the peserta page table."""
@@ -573,11 +620,79 @@ class DetailParser:
                         "diskualifikasi",
                         "alasan",
                         "keterangan",
+                        "tidak menghadiri",
                     ]
                 ) or len(txt) > 25:
                     alasan = txt if not alasan else f"{alasan}; {txt}"
                 elif re.search(r"^\d+([.,]\d+)?$", txt) and not nilai:
                     nilai = txt
+
+            p_data: dict[str, str] = {"name": name, "npwp": npwp}
+            if alasan:
+                p_data["alasan"] = alasan
+            if nilai:
+                p_data["nilai"] = nilai
+            participants.append(p_data)
+        return participants
+
+    def _parse_participants_from_evaluasi(self, html: str) -> list[dict]:
+        """Extract participant name, NPWP, evaluation score and reasons from /evaluasi/{id}/hasil."""
+        tree = HTMLParser(html)
+        participants: list[dict] = []
+        for tr in tree.css("tr"):
+            cells = tr.css("td, th")
+            if len(cells) < 3:
+                continue
+            first = (cells[0].text() or "").strip()
+            if not first.isdigit():
+                continue
+            name = (cells[1].text() or "").strip()
+            if not name or name.lower() in ["nama peserta", "nama"]:
+                continue
+
+            npwp = ""
+            alasan = ""
+            nilai = ""
+
+            # Check if any cell has fa-close / fa-times (indicating qualification failure)
+            has_failed_icon = False
+            for c in cells:
+                for icon in c.css("i"):
+                    cls_attr = (icon.attributes.get("class") or "").lower()
+                    if "fa-close" in cls_attr or "fa-times" in cls_attr:
+                        has_failed_icon = True
+
+            for i in range(2, len(cells)):
+                txt = (cells[i].text() or "").strip()
+                if not txt:
+                    continue
+                # NPWP pattern (masked or unmasked, e.g. 08*3**5****21**0)
+                if not npwp and (re.search(r"^\d{2}[*.\d\-]{6,}", txt) or (len(txt) >= 10 and "*" in txt and any(c.isdigit() for c in txt))):
+                    npwp = txt
+                    continue
+                # Evaluation notes / reasons
+                txt_lower = txt.lower()
+                if any(
+                    kw in txt_lower
+                    for kw in [
+                        "tidak lulus",
+                        "gugur",
+                        "ambang batas",
+                        "memenuhi",
+                        "tidak memenuhi",
+                        "diskualifikasi",
+                        "alasan",
+                        "keterangan",
+                        "tidak menghadiri",
+                        "evaluasi",
+                    ]
+                ) or len(txt) > 20:
+                    alasan = txt if not alasan else f"{alasan}; {txt}"
+                elif re.search(r"^\d+([.,]\d+)?$", txt) and not nilai:
+                    nilai = txt
+
+            if not alasan and has_failed_icon:
+                alasan = "Tidak lulus evaluasi kualifikasi SPSE"
 
             p_data: dict[str, str] = {"name": name, "npwp": npwp}
             if alasan:

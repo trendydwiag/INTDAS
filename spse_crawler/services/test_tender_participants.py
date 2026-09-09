@@ -191,10 +191,45 @@ class ParticipantParserTests(TestCase):
         self.assertEqual(parser._parse_peserta_count(html), 3)
         self.assertEqual(len(parser._parse_participants(html)), 3)
 
+    def test_parse_participants_from_evaluasi_with_th_npwp_and_alasan(self):
+        html = """
+        <table>
+            <tr><th>No</th><th>Nama Peserta</th><th>NPWP</th><th>Lulus</th><th>Nilai</th><th>Alasan</th></tr>
+            <tr>
+                <td>1</td>
+                <td>PT. KHATULISTIWA NUSANTARA INDONESIA</td>
+                <th>08*3**5****21**0</th>
+                <td><i class="fa fa-close"></i></td>
+                <th style="text-align:right">42,5</th>
+                <td>Tidak lulus hasil evaluasi unsur pengalaman perusahaan</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>PT. TRI CIPTA INTERNASIONAL</td>
+                <th>00*7**5****13**0</th>
+                <td><i class="fa fa-close"></i></td>
+                <th style="text-align:right">100,0</th>
+                <td>Tidak menghadiri pembuktian</td>
+            </tr>
+        </table>
+        """
+        parser = _parser_instance()
+        parts = parser._parse_participants_from_evaluasi(html)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(parts[0]["name"], "PT. KHATULISTIWA NUSANTARA INDONESIA")
+        self.assertEqual(parts[0]["npwp"], "08*3**5****21**0")
+        self.assertEqual(parts[0]["nilai"], "42,5")
+        self.assertEqual(parts[0]["alasan"], "Tidak lulus hasil evaluasi unsur pengalaman perusahaan")
+        self.assertEqual(parts[1]["name"], "PT. TRI CIPTA INTERNASIONAL")
+        self.assertEqual(parts[1]["alasan"], "Tidak menghadiri pembuktian")
+
 
 class TahapGateTests(TestCase):
     def test_active_eligible(self):
         self.assertTrue(DetailParser.is_eligible_tahap("pengumuman prakualifikasi"))
+        self.assertTrue(DetailParser.is_eligible_tahap("download dokumen pemilihan"))
+        self.assertTrue(DetailParser.is_eligible_tahap("masa sanggah prakualifikasi"))
+        self.assertTrue(DetailParser.is_eligible_tahap("pemberian penjelasan"))
 
     def test_awarded_retained_not_eligible(self):
         for tahap in ["penetapan pemenang", "kontrak", "rekomendasi pemenang"]:
