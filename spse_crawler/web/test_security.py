@@ -1598,3 +1598,62 @@ class TestWatchlistMutationCsrf(TestCase):
         self.assertEqual(data["status"], "success")
         self.assertFalse(TenderWatchlist.objects.filter(id=w.id).exists())
 
+
+class CrawlDeltaCsrfSecurityTests(TestCase):
+    """Verify CSRF protection and role-gating on /api/crawl-delta/."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.superadmin = User.objects.create_user(
+            username="delta_admin",
+            email="delta_admin@test.local",
+            password="testpass123",
+            role="superadmin",
+        )
+        cls.submitter = User.objects.create_user(
+            username="delta_submitter",
+            email="delta_submitter@test.local",
+            password="testpass123",
+            role="submitter",
+        )
+
+    def _login_client(self, email):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email=email, password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        return token.value
+
+    def test_unauthenticated_returns_401(self):
+        c = Client(enforce_csrf_checks=True)
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 401)
+
+    def test_submitter_returns_403(self):
+        c = self._login_client("delta_submitter@test.local")
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 403)
+
+    def test_missing_csrf_returns_403(self):
+        c = self._login_client("delta_admin@test.local")
+        r = c.post("/api/crawl-delta/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_invalid_csrf_returns_403(self):
+        c = self._login_client("delta_admin@test.local")
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN="invalid-token")
+        self.assertEqual(r.status_code, 403)
+
+    def test_valid_csrf_superadmin_succeeds(self):
+        c = self._login_client("delta_admin@test.local")
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn(data.get("status"), ("started", "no_delta"))

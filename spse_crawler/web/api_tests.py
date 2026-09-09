@@ -492,3 +492,26 @@ class AuthEnforcementTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 401)
+
+
+class StatusEndpointTests(TestCase):
+    """Test /api/status/ and automatic reconciliation of stale running jobs."""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_api_status_reconciles_stale_running_jobs(self):
+        from spse_crawler.web.models import CrawlJob
+        stale_job = CrawlJob.objects.create(
+            instansi_input="delta:all",
+            workers=4,
+            total_packages=5,
+            status="running",
+        )
+        resp = self.client.get("/api/status/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("recent_jobs", data)
+        stale_job.refresh_from_db()
+        self.assertEqual(stale_job.status, "failed")
+        self.assertIn("terhenti", stale_job.error_message)

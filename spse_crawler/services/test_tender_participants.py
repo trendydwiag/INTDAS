@@ -335,3 +335,71 @@ class ParticipantPersistenceTests(TestCase):
         self.assertIsNone(p.company)
         self.assertEqual(p.resolution_status, "UNRESOLVED")
         self.assertEqual(CompanyProfile.objects.count(), 0)
+
+    def test_participant_sync_auto_watchlist_and_gagal_status(self):
+        """When participant matches registered company with failure note, set gagal and watchlist."""
+        from spse_crawler.web.models_watchlist import TenderWatchlist
+        from spse_crawler.submissions.models import TenderSubmissionStatus
+
+        company = CompanyProfile.objects.create(
+            name="PT Khatulistiwa Nusantara Indonesia",
+            nib="0220208762392",
+            npwp="0823955182421000",
+        )
+        tender = _mk_tender(id_lelang="10161860000")
+        parts = [
+            {
+                "name": "PT. KHATULISTIWA NUSANTARA INDONESIA",
+                "npwp": "08*3**5****21**0",
+                "alasan": "Tidak lulus ambang batas unsur pengalaman perusahaan.",
+            }
+        ]
+        sync_tender_participants(tender, parts)
+
+        # 1. Watchlist auto-created
+        wl = TenderWatchlist.objects.filter(company=company, tender=tender).first()
+        self.assertIsNotNone(wl)
+
+        # 2. Submission status auto-created with 'gagal'
+        sub = TenderSubmissionStatus.objects.filter(company=company, tender=tender).first()
+        self.assertIsNotNone(sub)
+        self.assertEqual(sub.status, "gagal")
+        self.assertEqual(sub.notes, "Tidak lulus ambang batas unsur pengalaman perusahaan.")
+
+    def test_participant_sync_sudah_submit_status(self):
+        """When participant matches registered company without failure, set sudah_submit."""
+        from spse_crawler.web.models_watchlist import TenderWatchlist
+        from spse_crawler.submissions.models import TenderSubmissionStatus
+
+        company = CompanyProfile.objects.create(
+            name="PT Maju Bersama",
+            nib="9120000055555",
+            npwp="012345678901234",
+        )
+        tender = _mk_tender(id_lelang="77777")
+        parts = [
+            {
+                "name": "PT. MAJU BERSAMA",
+                "npwp": "012345678901234",
+            }
+        ]
+        sync_tender_participants(tender, parts)
+
+        wl = TenderWatchlist.objects.filter(company=company, tender=tender).first()
+        self.assertIsNotNone(wl)
+
+        sub = TenderSubmissionStatus.objects.filter(company=company, tender=tender).first()
+        self.assertIsNotNone(sub)
+        self.assertEqual(sub.status, "sudah_submit")
+
+    def test_unregistered_participant_does_not_create_watchlist(self):
+        """Unmatched participant does not create watchlist or submission."""
+        from spse_crawler.web.models_watchlist import TenderWatchlist
+        from spse_crawler.submissions.models import TenderSubmissionStatus
+
+        tender = _mk_tender(id_lelang="88888")
+        parts = [{"name": "PT Unknown Company", "npwp": "9999999999"}]
+        sync_tender_participants(tender, parts)
+
+        self.assertEqual(TenderWatchlist.objects.count(), 0)
+        self.assertEqual(TenderSubmissionStatus.objects.count(), 0)

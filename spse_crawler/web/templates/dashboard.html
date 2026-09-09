@@ -337,6 +337,13 @@
             <span id="crawl-btn-text">Perbarui Data</span>
             <span id="crawl-spinner" class="spinner hidden"></span>
           </button>
+          <button onclick="startDeltaCrawl()" id="btn-crawl-delta"
+            title="Hanya mengambil ulang detail rincian untuk tender yang belum lengkap"
+            class="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white transition-colors flex items-center justify-center gap-2 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span id="crawl-delta-btn-text">Perkaya Data Delta</span>
+            <span id="crawl-delta-spinner" class="spinner hidden"></span>
+          </button>
         </div>
         <div id="crawl-status" class="mt-2 text-[10px] text-slate-500 hidden"></div>
       </div>
@@ -1785,6 +1792,10 @@ async function startCrawl() {
 
     statusEl.className = 'mt-2 text-[10px] text-blue-600';
     statusEl.textContent = `Sinkronisasi berjalan: ${data.instansi_count || '?'} instansi, ${data.workers} pekerja`;
+    const monitorPanel = document.getElementById('monitor-panel');
+    if (monitorPanel && monitorPanel.classList.contains('hidden')) {
+      toggleMonitorPanel();
+    }
     pollCrawlStatus();
   } catch (e) {
     statusEl.className = 'mt-2 text-[10px] text-red-600';
@@ -1793,6 +1804,63 @@ async function startCrawl() {
     btn.disabled = false;
     spinner.classList.add('hidden');
     btnText.textContent = 'Perbarui Data';
+  }
+}
+
+async function startDeltaCrawl() {
+  const instansi = document.getElementById('crawl-instansi').value.trim() || 'all';
+  const btn = document.getElementById('btn-crawl-delta');
+  const btnText = document.getElementById('crawl-delta-btn-text');
+  const spinner = document.getElementById('crawl-delta-spinner');
+  const statusEl = document.getElementById('crawl-status');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  btnText.textContent = 'Menyiapkan Delta...';
+  statusEl.classList.remove('hidden');
+  statusEl.className = 'mt-2 text-[10px] text-amber-600';
+  statusEl.textContent = 'Menganalisis data delta yang belum lengkap...';
+
+  try {
+    const form = new URLSearchParams();
+    form.append('instansi', instansi);
+    form.append('workers', '3');
+
+    const resp = await apiFetch('/api/crawl-delta/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      statusEl.className = 'mt-2 text-[10px] text-red-600';
+      statusEl.textContent = 'Gagal: ' + (data.error || 'Terjadi kesalahan');
+      return;
+    }
+
+    if (data.status === 'no_delta') {
+      statusEl.className = 'mt-2 text-[10px] text-emerald-600';
+      statusEl.textContent = data.message || 'Semua data tender sudah lengkap.';
+      return;
+    }
+
+    statusEl.className = 'mt-2 text-[10px] text-blue-600';
+    statusEl.textContent = `Sinkronisasi delta berjalan: ${data.delta_count} tender diproses...`;
+    const monitorPanel = document.getElementById('monitor-panel');
+    if (monitorPanel && monitorPanel.classList.contains('hidden')) {
+      toggleMonitorPanel();
+    }
+    pollCrawlStatus();
+  } catch (e) {
+    statusEl.className = 'mt-2 text-[10px] text-red-600';
+    statusEl.textContent = 'Gagal menghubungi server: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    btnText.textContent = 'Perkaya Data Delta';
   }
 }
 
@@ -2948,17 +3016,19 @@ function renderTenderDetail(d) {
 
   // Jadwal table
   const jBody = document.getElementById('tdm-jadwal-body');
-  if (d.jadwal_json && d.jadwal_json.length) {
-    jBody.innerHTML = d.jadwal_json.map(j => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-3 py-1.5 text-slate-400">${esc(j.no)}</td>
-        <td class="px-3 py-1.5 font-medium text-slate-700">${esc(j.tahap)}</td>
-        <td class="px-3 py-1.5 text-slate-600">${esc(j.mulai)}</td>
-        <td class="px-3 py-1.5 text-slate-600">${esc(j.sampai)}</td>
-        <td class="px-3 py-1.5 text-slate-400">${esc(j.perubahan)}</td>
-      </tr>`).join('');
-  } else {
-    document.getElementById('tdm-jadwal').innerHTML = '<p class="text-[11px] text-slate-400 italic">Jadwal tidak tersedia</p>';
+  if (jBody) {
+    if (d.jadwal_json && d.jadwal_json.length) {
+      jBody.innerHTML = d.jadwal_json.map(j => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-1.5 text-slate-400">${esc(j.no)}</td>
+          <td class="px-3 py-1.5 font-medium text-slate-700">${esc(j.tahap)}</td>
+          <td class="px-3 py-1.5 text-slate-600">${esc(j.mulai)}</td>
+          <td class="px-3 py-1.5 text-slate-600">${esc(j.sampai)}</td>
+          <td class="px-3 py-1.5 text-slate-400">${esc(j.perubahan)}</td>
+        </tr>`).join('');
+    } else {
+      jBody.innerHTML = '<tr><td colspan="5" class="px-3 py-2 text-[11px] text-slate-400 italic text-center">Jadwal tidak tersedia</td></tr>';
+    }
   }
 
   // Syarat kualifikasi
@@ -3164,6 +3234,9 @@ function renderSubmissionActions(djangoId, sub) {
     const color = currentStatus === 'menang' ? 'emerald' : 'red';
     const label = currentStatus === 'menang' ? 'Berhasil Menang Tender' : 'Gagal Menang Tender';
     html += '<div class="text-[11px] text-' + color + '-600 font-medium">' + label + '</div>';
+    if (sub && sub.notes) {
+      html += '<div class="mt-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2"><span class="font-semibold text-slate-700">Catatan:</span> ' + esc(sub.notes) + '</div>';
+    }
   } else {
     html += '<button onclick="updateSubmission(' + djangoId + ', \'sudah_submit\')" class="w-full px-3 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-2">';
     html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';

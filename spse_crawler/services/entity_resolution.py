@@ -60,6 +60,7 @@ def mask_identifier(raw: str | None) -> str:
 class ResolutionStatus(str, Enum):
     EXACT_NPWP = "EXACT_NPWP"
     EXACT_OFFICIAL_IDENTIFIER = "EXACT_OFFICIAL_IDENTIFIER"
+    EXACT_MATCH_NAME_MASKED_NPWP = "EXACT_MATCH_NAME_MASKED_NPWP"
     CANDIDATE_ONLY = "CANDIDATE_ONLY"
     IDENTITY_CONFLICT = "IDENTITY_CONFLICT"
     UNRESOLVED = "UNRESOLVED"
@@ -67,8 +68,84 @@ class ResolutionStatus(str, Enum):
 
 # Only these statuses permit automatic linking.
 AUTO_LINK_STATUSES = frozenset(
-    {ResolutionStatus.EXACT_NPWP, ResolutionStatus.EXACT_OFFICIAL_IDENTIFIER}
+    {
+        ResolutionStatus.EXACT_NPWP,
+        ResolutionStatus.EXACT_OFFICIAL_IDENTIFIER,
+        ResolutionStatus.EXACT_MATCH_NAME_MASKED_NPWP,
+    }
 )
+
+
+def normalize_company_name(name: str | None) -> str:
+    """Normalize an Indonesian corporate entity name for robust comparison.
+
+    Strips legal forms (PT, CV, UD, etc.), suffixes (Tbk, Persero), punctuation,
+    and extra spaces, returning a canonical lowercase string.
+    Example: 'PT. KHATULISTIWA NUSANTARA INDONESIA' -> 'khatulistiwa nusantara indonesia'.
+    """
+    if not name:
+        return ""
+    s = str(name).strip().lower()
+    # Remove common Indonesian corporate prefixes
+    s = re.sub(
+        r"^(pt\.|pt|cv\.|cv|ud\.|ud|po\.|po|fa\.|firma|koperasi|yayasan|perum|perseroan terbatas)\b[\s.]*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+    # Remove dotted forms like p.t. or c.v.
+    s = re.sub(r"^(p\.t\.|c\.v\.|u\.d\.)[\s.]*", "", s, flags=re.IGNORECASE)
+    # Remove common suffixes like 'tbk' or 'persero'
+    s = re.sub(r"\b(tbk|persero)\b", "", s, flags=re.IGNORECASE)
+    # Remove punctuation
+    s = re.sub(r"[\.,\-/\(\)'\"]+", " ", s)
+    # Collapse whitespace
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def matches_masked_npwp(masked: str | None, full: str | None) -> bool:
+    """Check if a masked NPWP (e.g. '08*3**5****21**0') matches a full NPWP.
+
+    Returns True if at least 3 unmasked digits match and no unmasked digit conflicts.
+    """
+    if not masked or not full:
+        return False
+    m_clean = re.sub(r"[\s.\-/]+", "", str(masked).strip())
+    f_clean = re.sub(r"[\s.\-/]+", "", str(full).strip())
+    if not m_clean or not f_clean:
+        return False
+
+    # Must contain at least one mask character
+    if not any(ch in _MASK_CHARS for ch in m_clean):
+        return False
+
+    def _check_alignment(m_str: str, f_str: str) -> bool:
+        if len(m_str) != len(f_str):
+            return False
+        matched_digits = 0
+        for m_ch, f_ch in zip(m_str, f_str):
+            if m_ch in _MASK_CHARS:
+                continue
+            if not m_ch.isdigit() or not f_ch.isdigit():
+                return False
+            if m_ch != f_ch:
+                return False
+            matched_digits += 1
+        return matched_digits >= 3
+
+    if _check_alignment(m_clean, f_clean):
+        return True
+
+    # Indonesian NPWP transition: 15 digits vs 16 digits (prefixed with '0')
+    if len(m_clean) == 15 and len(f_clean) == 16 and f_clean.startswith("0"):
+        if _check_alignment(m_clean, f_clean[1:]):
+            return True
+    elif len(m_clean) == 16 and len(f_clean) == 15 and m_clean.startswith("0"):
+        if _check_alignment(m_clean[1:], f_clean):
+            return True
+
+    return False
 
 
 def normalize_npwp(raw: str | None) -> str | None:
@@ -278,6 +355,59 @@ def resolve_company_identity(
             reason="NPWP matched no CompanyProfile and no name candidate",
             normalized_npwp=normalized_npwp,
         )
+
+    # Priority 2b: masked NPWP + normalized company name match (SPSE participant resolution)
+    if npwp and any(ch in _MASK_CHARS for ch in npwp) and name:
+        norm_name = normalize_company_name(name)
+        if norm_name:
+            name_cands = [
+                c for c in CompanyProfile.objects.all()
+                if normalize_company_name(c.name) == norm_name
+            ]
+            matched_by_npwp = [
+                c for c in name_cands
+                if matches_masked_npwp(npwp, c.npwp)
+            ]
+            if len(matched_by_npwp) == 1:
+                logger.info(
+                    "ENTITY_AUTO_LINK company={} (id={}) via normalized name + masked NPWP={}",
+                    matched_by_npwp[0].name,
+                    matched_by_npwp[0].id,
+                    mask_identifier(npwp),
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.EXACT_MATCH_NAME_MASKED_NPWP,
+                    company=matched_by_npwp[0],
+                    candidates=tuple(matched_by_npwp),
+                    reason="exact normalized name + consistent masked NPWP match",
+                    normalized_npwp=matched_by_npwp[0].npwp,
+                )
+            if len(matched_by_npwp) > 1:
+                logger.warning(
+                    "ENTITY_ID_CONFLICT masked NPWP={} + name={} matched {} companies (ids={}); no auto-link",
+                    mask_identifier(npwp),
+                    name,
+                    len(matched_by_npwp),
+                    [c.id for c in matched_by_npwp],
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.IDENTITY_CONFLICT,
+                    company=None,
+                    candidates=tuple(matched_by_npwp),
+                    reason="multiple companies match name + masked NPWP; integrity conflict",
+                )
+            if name_cands:
+                logger.debug(
+                    "ENTITY_CANDIDATE name={} — masked NPWP mismatch; candidate ids={} (no auto-link)",
+                    name,
+                    [c.id for c in name_cands],
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.CANDIDATE_ONLY,
+                    company=None,
+                    candidates=tuple(name_cands),
+                    reason="masked NPWP did not match profile; candidate by name only (no auto-link)",
+                )
 
     # No usable NPWP / NIB: name only.
     if name:

@@ -74,16 +74,130 @@ def sync_tender_participants(
         result = resolve_company_identity(name=name, npwp=p.get("npwp"))
         if apply_resolution_to(obj, result):
             obj.save(update_fields=["company", "resolution_status", "updated_at"])
+        if getattr(tender, "pk", None) and obj.company:
+            try:
+                _sync_participant_submission_and_watchlist(tender, obj.company, name, p)
+            except Exception as e:
+                logger.warning(
+                    "PARTICIPANT_AUTO_WATCHLIST_FAIL tender_id={} company_id={} error={}",
+                    _safe_tender_id(tender),
+                    obj.company_id,
+                    e,
+                )
         if was_created:
             created += 1
         else:
             updated += 1
     logger.info(
         "PARTICIPANT_SYNC tender_id={} created={} updated={} total={}",
-        _safe_tender_id(tender), created, updated,
+        _safe_tender_id(tender),
+        created,
+        updated,
         len(participants or []),
     )
     return SyncStats(created=created, updated=updated)
+
+
+def _sync_participant_submission_and_watchlist(
+    tender: "TenderResult",
+    company,
+    participant_name: str,
+    p_data: dict,
+) -> None:
+    """Auto-add matched company to TenderWatchlist and TenderSubmissionStatus."""
+    from spse_crawler.web.models_watchlist import TenderWatchlist
+    from spse_crawler.submissions.models import TenderSubmissionStatus
+    from spse_crawler.services.entity_resolution import (
+        normalize_company_name,
+        normalize_npwp,
+        matches_masked_npwp,
+    )
+
+    alasan = (p_data.get("alasan") or "").strip()
+    alasan_lower = alasan.lower()
+
+    # Detect failure keywords in evaluation / alasan
+    is_failed = any(
+        kw in alasan_lower
+        for kw in [
+            "tidak lulus",
+            "gugur",
+            "tidak memenuhi",
+            "ambang batas",
+            "diskualifikasi",
+            "batal",
+        ]
+    )
+
+    # Check winner status
+    winner = getattr(tender, "winner", None)
+    is_winner = False
+    if winner:
+        if winner.company_id == company.id:
+            is_winner = True
+        elif winner.nama_pemenang and normalize_company_name(winner.nama_pemenang) == normalize_company_name(company.name):
+            is_winner = True
+        elif winner.npwp and company.npwp and (
+            normalize_npwp(winner.npwp) == normalize_npwp(company.npwp)
+            or matches_masked_npwp(winner.npwp, company.npwp)
+        ):
+            is_winner = True
+
+    if is_failed:
+        sub_status = "gagal"
+        sub_notes = alasan
+    elif is_winner:
+        sub_status = "menang"
+        sub_notes = f"Pemenang lelang ({winner.nama_pemenang or company.name})"
+    else:
+        sub_status = "sudah_submit"
+        sub_notes = alasan or "Terdaftar sebagai peserta lelang di SPSE."
+
+    user = company.users.first() if hasattr(company, "users") else None
+
+    # 1. TenderWatchlist: auto-add if not already in watchlist
+    TenderWatchlist.objects.get_or_create(
+        company=company,
+        tender=tender,
+        defaults={
+            "user": user,
+            "notes": f"Otomatis masuk Watchlist dari peserta SPSE ({sub_status}).",
+        },
+    )
+
+    # 2. TenderSubmissionStatus: do not downgrade existing 'menang'
+    existing_sub = TenderSubmissionStatus.objects.filter(tender=tender, company=company).first()
+    if existing_sub and existing_sub.status == "menang" and sub_status == "sudah_submit":
+        sub_status = "menang"
+
+    TenderSubmissionStatus.objects.update_or_create(
+        tender=tender,
+        company=company,
+        defaults={
+            "status": sub_status,
+            "notes": sub_notes,
+            "updated_by": user,
+        },
+    )
+
+
+def sync_participant_submissions_for_tender(tender: "TenderResult") -> int:
+    """Evaluate and sync submissions + watchlists for all participants of a tender."""
+    count = 0
+    for p in tender.participants.all():
+        if not p.company_id:
+            res = resolve_company_identity(name=p.name, npwp=p.npwp)
+            if apply_resolution_to(p, res):
+                p.save(update_fields=["company", "resolution_status", "updated_at"])
+        if p.company:
+            _sync_participant_submission_and_watchlist(
+                tender=tender,
+                company=p.company,
+                participant_name=p.name,
+                p_data={"name": p.name, "npwp": p.npwp},
+            )
+            count += 1
+    return count
 
 
 def _safe_tender_id(tender) -> str:

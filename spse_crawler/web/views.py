@@ -685,6 +685,207 @@ def api_start_crawl(request):
     })
 
 
+@require_superadmin
+def api_crawl_delta(request):
+    """Re-crawl minor/delta tender records with incomplete details in the database."""
+    global _crawl_thread
+
+    if _crawl_lock.locked():
+        return JsonResponse({"error": "Proses crawling atau sinkronisasi delta sedang berjalan"}, status=409)
+
+    instansi_input = request.POST.get("instansi", "all").strip()
+    workers = _safe_int(request.POST.get("workers"), 3, 1, 10)
+
+    # Filter delta tenders: missing satker detail, empty syarat kualifikasi, empty jadwal, or 0 participants
+    delta_filter = (
+        Q(satuan_kerja_detail="")
+        | Q(syarat_kualifikasi="")
+        | Q(jadwal_json=[])
+        | Q(jadwal_json__isnull=True)
+        | Q(peserta_count=0)
+    )
+
+    qs = TenderResult.objects.filter(delta_filter)
+
+    if instansi_input and instansi_input.lower() != "all":
+        codes = [c.strip() for c in instansi_input.split(",") if c.strip()]
+        valid_codes = [c for c in codes if c in INSTANSI_CODES]
+        if not valid_codes:
+            return JsonResponse({
+                "error": f"Kode instansi tidak valid: {instansi_input}. Gunakan kode SPSE yang valid."
+            }, status=400)
+        qs = qs.filter(kode_instansi__in=valid_codes)
+
+    total_delta = qs.count()
+    if total_delta == 0:
+        return JsonResponse({
+            "status": "no_delta",
+            "message": "Tidak ada data delta yang perlu diperkaya. Seluruh data tender sudah lengkap.",
+            "delta_count": 0,
+        })
+
+    tender_ids = list(qs.order_by("-tanggal_dibuat", "-id").values_list("id", flat=True))
+
+    logger.info(
+        "[DELTA_CRAWL] Starting delta enrichment for {} tenders (workers={})",
+        len(tender_ids),
+        workers,
+    )
+
+    _crawl_thread = threading.Thread(
+        target=_run_delta_crawl_in_thread,
+        args=(tender_ids, workers, instansi_input),
+        daemon=True,
+        name="spse-delta-crawl-worker",
+    )
+    _crawl_thread.start()
+
+    return JsonResponse({
+        "status": "started",
+        "message": f"Sinkronisasi data delta dimulai untuk {len(tender_ids)} paket tender.",
+        "delta_count": len(tender_ids),
+        "workers": workers,
+    })
+
+
+def _run_delta_crawl_in_thread(tender_ids: list[int], workers: int, instansi_input: str) -> None:
+    """Run delta enrichment in a dedicated background thread with its own event loop."""
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "web_ui.settings")
+    django.setup()
+
+    if not _crawl_lock.acquire(blocking=False):
+        logger.warning("[DELTA_CRAWL] Lock already held — aborting")
+        return
+    try:
+        logger.info("[DELTA_CRAWL] Thread started — creating event loop")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_execute_delta_crawl(tender_ids, workers, instansi_input))
+        logger.info("[DELTA_CRAWL] Event loop completed successfully")
+    except Exception as exc:
+        logger.error("[DELTA_CRAWL] Thread failed with exception: {}", exc)
+        logger.error("[DELTA_CRAWL] Traceback:\n{}", traceback.format_exc())
+    finally:
+        _crawl_lock.release()
+        loop.close()
+        logger.info("[DELTA_CRAWL] Thread finished — lock released")
+
+
+async def _execute_delta_crawl(tender_ids: list[int], workers: int, instansi_input: str) -> None:
+    """Coroutine to re-scrape detail and sync participants for delta tenders."""
+    from spse_crawler.core.browser import SpseHttpClient
+    from spse_crawler.parsers.detail import DetailParser
+    from spse_crawler.models.tender import TenderPackage
+    from spse_crawler.config import get_settings
+
+    progress = get_progress_tracker()
+    _create_job = sync_to_async(CrawlJob.objects.create)
+    _save_obj = sync_to_async(lambda o: o.save())
+    _sync_participants = sync_to_async(sync_tender_participants)
+    _sync_winner = sync_to_async(sync_tender_winner)
+
+    progress.start(total_instansi=1, total_packages=len(tender_ids))
+    progress.set_instansi("delta_sync", 0)
+
+    job = await _create_job(
+        instansi_input=f"delta:{instansi_input[:90]}",
+        workers=workers,
+        total_packages=len(tender_ids),
+        status="running",
+    )
+
+    settings = get_settings()
+    saved = 0
+    errors = 0
+
+    try:
+        async with SpseHttpClient(settings) as http:
+            detail_parser = DetailParser(http, settings=settings)
+            semaphore = asyncio.Semaphore(workers)
+
+            async def _process_one_tender(tid: int):
+                nonlocal saved, errors
+                async with semaphore:
+                    try:
+                        t = await sync_to_async(TenderResult.objects.get)(id=tid)
+                        pkg = TenderPackage(
+                            kode_instansi=t.kode_instansi,
+                            id_lelang=t.id_lelang,
+                            nama_paket=t.nama_paket,
+                            instansi=t.instansi,
+                            hps=t.hps,
+                            jenis_pengadaan=t.jenis_pengadaan,
+                            tahap_saat_ini=t.tahap_saat_ini,
+                        )
+                        detail = await detail_parser.scrape_detail(pkg)
+                        if detail is not None:
+                            if detail.satuan_kerja_detail:
+                                t.satuan_kerja_detail = detail.satuan_kerja_detail
+                            if detail.syarat_kualifikasi:
+                                t.syarat_kualifikasi = detail.syarat_kualifikasi
+                            if detail.jadwal:
+                                t.jadwal_json = detail.jadwal
+                            if detail.peserta_count:
+                                t.peserta_count = detail.peserta_count
+                            if detail.lokasi_pekerjaan:
+                                t.lokasi_pekerjaan = detail.lokasi_pekerjaan
+                            if detail.metode_pengadaan:
+                                t.metode_pengadaan = detail.metode_pengadaan
+                            if detail.tahun_anggaran:
+                                t.tahun_anggaran = detail.tahun_anggaran
+                            if detail.requirement_text:
+                                t.requirement_text = detail.requirement_text
+                            if detail.kbli_code:
+                                t.kbli_code = detail.kbli_code
+                            if detail.kbli_description:
+                                t.kbli_description = detail.kbli_description
+                            await _save_obj(t)
+
+                            if detail.participants:
+                                await _sync_participants(
+                                    t,
+                                    detail.participants,
+                                    source_url=detail.url_pengumuman,
+                                    source_fetched_at=detail.scraped_at,
+                                )
+                            if detail.winner:
+                                await _sync_winner(
+                                    t,
+                                    detail.winner,
+                                    source_url=detail.winner_source_url,
+                                    source_fetched_at=detail.scraped_at,
+                                )
+                        saved += 1
+                        progress.mark_processed("delta_sync", t.id_lelang, saved=True)
+                    except Exception as exc:
+                        errors += 1
+                        progress.mark_error("delta_sync", str(exc))
+                        logger.warning("[DELTA_CRAWL] Failed to enrich tender id={}: {}", tid, exc)
+
+            tasks = [_process_one_tender(tid) for tid in tender_ids]
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        progress.finish(success=(errors == 0 or saved > 0))
+
+        job.status = "completed" if (errors == 0 or saved > 0) else "failed"
+        job.total_details = saved
+        job.finished_at = dj_timezone.now()
+        if errors > 0:
+            job.error_message = f"{errors} error(s) during delta crawl"
+        await _save_obj(job)
+        logger.info("[DELTA_CRAWL] Completed — {} saved, {} errors", saved, errors)
+
+    except Exception as exc:
+        job.status = "failed"
+        job.error_message = f"{exc}\n{traceback.format_exc()}"
+        job.finished_at = dj_timezone.now()
+        await _save_obj(job)
+        progress.finish(success=False, error_msg=str(exc))
+        logger.error("[DELTA_CRAWL] Job #{} failed: {}", job.id, exc)
+
+
 def _run_crawl_in_thread(instansi_input: str, workers: int, instansi_list: list[str]) -> None:
     """Run crawl in a dedicated background thread with its own event loop."""
     # Ensure Django ORM is initialized for this thread
@@ -909,6 +1110,19 @@ async def _execute_crawl(instansi_input: str, workers: int, instansi_list: list[
 def api_status(request):
     scheduler = get_scheduler()
     progress = get_progress_tracker()
+
+    # Reconcile stale running jobs if lock is not held
+    if not _crawl_lock.locked():
+        stale_jobs = CrawlJob.objects.filter(status="running")
+        if stale_jobs.exists():
+            stale_jobs.update(
+                status="failed",
+                error_message="Proses crawler terhenti atau server di-restart",
+                finished_at=dj_timezone.now(),
+            )
+            if progress.get_progress().get("status") == "Running":
+                progress.finish(success=False, error_msg="Proses terhenti")
+
     jobs = list(CrawlJob.objects.order_by("-started_at")[:5].values(
         "id", "instansi_input", "status", "total_details",
         "error_message", "started_at", "finished_at",

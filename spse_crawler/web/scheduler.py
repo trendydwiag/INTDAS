@@ -32,9 +32,9 @@ def start_scheduler() -> None:
 
     scheduler.add_job(
         func=_run_background_crawl,
-        trigger=IntervalTrigger(hours=1),
+        trigger=IntervalTrigger(hours=3),
         id="hourly_crawl",
-        name="Hourly SPSE Crawl",
+        name="SPSE Crawl (Every 3 Hours)",
         replace_existing=True,
         next_run_time=None,
     )
@@ -48,7 +48,7 @@ def start_scheduler() -> None:
         next_run_time=datetime.now(timezone.utc),
     )
     scheduler.start()
-    logger.info("APScheduler started — hourly crawl + pipeline jobs registered")
+    logger.info("APScheduler started — 3-hourly crawl + pipeline jobs registered")
 
 
 def stop_scheduler() -> None:
