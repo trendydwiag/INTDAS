@@ -24,6 +24,8 @@ from spse_crawler.services.entity_resolution import (
     ResolutionResult,
     ResolutionStatus,
     apply_resolution_to,
+    matches_masked_npwp,
+    normalize_company_name,
     normalize_npwp,
     resolve_company_identity,
 )
@@ -85,11 +87,84 @@ class NormalizeNpwpTests(TestCase):
         self.assertNotEqual(normalize_npwp("1111111111"), normalize_npwp("2222222222"))
 
 
+class NormalizeCompanyNameTests(TestCase):
+    def test_strips_pt_prefix_and_punctuation(self):
+        self.assertEqual(
+            normalize_company_name("PT. KHATULISTIWA NUSANTARA INDONESIA"),
+            "khatulistiwa nusantara indonesia",
+        )
+        self.assertEqual(
+            normalize_company_name("PT Khatulistiwa Nusantara Indonesia"),
+            "khatulistiwa nusantara indonesia",
+        )
+
+    def test_strips_cv_ud_and_suffixes(self):
+        self.assertEqual(normalize_company_name("CV. MAJU BERSAMA, TBK"), "maju bersama")
+        self.assertEqual(normalize_company_name("UD. Berkah Mandiri"), "berkah mandiri")
+        self.assertEqual(normalize_company_name("PT. Telkom Indonesia (Persero)"), "telkom indonesia")
+
+    def test_empty_and_none(self):
+        self.assertEqual(normalize_company_name(None), "")
+        self.assertEqual(normalize_company_name(""), "")
+        self.assertEqual(normalize_company_name("   "), "")
+
+
+class MatchesMaskedNpwpTests(TestCase):
+    def test_matches_khatulistiwa_masked_npwp(self):
+        # User example: 08*3**5****21**0 vs 0823955182421000
+        self.assertTrue(matches_masked_npwp("08*3**5****21**0", "0823955182421000"))
+
+    def test_rejects_mismatch_digits(self):
+        # First digit 09 vs 08
+        self.assertFalse(matches_masked_npwp("09*3**5****21**0", "0823955182421000"))
+
+    def test_handles_15_vs_16_digits(self):
+        # 15-digit masked vs 16-digit prefixed with 0
+        self.assertTrue(matches_masked_npwp("8*3**5****21**0", "0823955182421000"))
+
+    def test_rejects_insufficient_digits(self):
+        # Only 2 matched digits -> rejected for low confidence
+        self.assertFalse(matches_masked_npwp("08****************", "0823955182421000"))
+
+    def test_empty_or_unmasked(self):
+        self.assertFalse(matches_masked_npwp("", "0823955182421000"))
+        self.assertFalse(matches_masked_npwp(None, "0823955182421000"))
+        self.assertFalse(matches_masked_npwp("0823955182421000", "0823955182421000"))  # no mask chars
+
+
 # ---------------------------------------------------------------------------
 # Entity resolution
 # ---------------------------------------------------------------------------
 
 class ResolveCompanyIdentityTests(TestCase):
+    def test_exact_name_and_masked_npwp_auto_match(self):
+        # Matches PT Khatulistiwa Nusantara Indonesia with masked NPWP
+        c = _mk_company(
+            name="PT Khatulistiwa Nusantara Indonesia",
+            nib="0220208762392",
+            npwp="0823955182421000",
+        )
+        res = resolve_company_identity(
+            name="PT. KHATULISTIWA NUSANTARA INDONESIA",
+            npwp="08*3**5****21**0",
+        )
+        self.assertEqual(res.status, ResolutionStatus.EXACT_MATCH_NAME_MASKED_NPWP)
+        self.assertEqual(res.company.id, c.id)
+        self.assertIn(res.status, AUTO_LINK_STATUSES)
+
+    def test_masked_npwp_mismatch_not_auto_linked(self):
+        c = _mk_company(
+            name="PT Khatulistiwa Nusantara Indonesia",
+            nib="0220208762392",
+            npwp="0823955182421000",
+        )
+        # Mismatched masked NPWP (starts with 09 instead of 08)
+        res = resolve_company_identity(
+            name="PT. KHATULISTIWA NUSANTARA INDONESIA",
+            npwp="09*3**5****21**0",
+        )
+        self.assertEqual(res.status, ResolutionStatus.CANDIDATE_ONLY)
+        self.assertIsNone(res.company)
     def test_exact_npwp_auto_match(self):
         c = _mk_company(name="PT Alpha", nib="912000001", npwp="012345678901000")
         res = resolve_company_identity(name="PT Alpha", npwp="01.234.567.8-901.000")

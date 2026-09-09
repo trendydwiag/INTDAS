@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/tenders/<int:pk>/detail/", views.api_tender_detail, name="api_tender_detail"),
     path("api/filter-counts/", views.api_filter_counts, name="api_filter_counts"),
     path("api/start-crawl/", views.api_start_crawl, name="api_start_crawl"),
+    path("api/crawl-delta/", views.api_crawl_delta, name="api_crawl_delta"),
     path("api/status/", views.api_status, name="api_status"),
     path("api/crawl-progress/", views.api_crawl_progress, name="api_crawl_progress"),
     path("api/status/toggle/", views.api_toggle_scheduler, name="api_toggle_scheduler"),

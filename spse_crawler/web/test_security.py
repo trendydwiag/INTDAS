@@ -876,3 +876,784 @@ class TestPhase66ReportAuthorization(_AdminClientMixin, TestCase):
         self.assertIn("counts", data)
         self.assertIn("omset", data)
 
+
+# ---------------------------------------------------------------------------
+# UX-005 — Sidebar Role-Gating & Operational Controls Separation
+# ---------------------------------------------------------------------------
+class TestUX005SidebarRoleGating(_AdminClientMixin, TestCase):
+    """Verify role-gating and clean separation of operational controls in dashboard sidebar."""
+
+    OPERATIONAL_MARKERS = [
+        "Kontrol Operasional",
+        'id="btn-crawl"',
+        'id="crawl-instansi"',
+        "Flush Data Non-Aktif",
+        'id="flush-modal"',
+        'id="btn-scheduler"',
+        'id="monitor-status-badge"',
+        'id="kbli-modal"',
+        "Kelola KBLI",
+    ]
+
+    BUSINESS_MARKERS = [
+        "Profil Perusahaan",
+        "Pipeline Pengajuan",
+        "Watchlist",
+        "filter-hps-max",
+    ]
+
+    def test_anonymous_user_sidebar_has_no_operational_controls(self):
+        c = Client()
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode("utf-8")
+
+        for marker in self.OPERATIONAL_MARKERS:
+            self.assertNotIn(marker, html, f"Operational marker '{marker}' found in anonymous dashboard render")
+
+        for marker in self.BUSINESS_MARKERS:
+            self.assertIn(marker, html, f"Business marker '{marker}' missing from anonymous dashboard render")
+
+    def test_submitter_user_sidebar_has_no_operational_controls(self):
+        c = Client()
+        c.login(email=self.submitter.email, password="testpass123")
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode("utf-8")
+
+        for marker in self.OPERATIONAL_MARKERS:
+            self.assertNotIn(marker, html, f"Operational marker '{marker}' found in submitter dashboard render")
+
+        for marker in self.BUSINESS_MARKERS:
+            self.assertIn(marker, html, f"Business marker '{marker}' missing from submitter dashboard render")
+
+    def test_company_admin_user_sidebar_has_no_operational_controls(self):
+        c = Client()
+        c.login(email=self.company_admin.email, password="testpass123")
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode("utf-8")
+
+        for marker in self.OPERATIONAL_MARKERS:
+            self.assertNotIn(marker, html, f"Operational marker '{marker}' found in company_admin dashboard render")
+
+        for marker in self.BUSINESS_MARKERS:
+            self.assertIn(marker, html, f"Business marker '{marker}' missing from company_admin dashboard render")
+
+    def test_superadmin_user_sidebar_has_operational_controls(self):
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode("utf-8")
+
+        for marker in self.OPERATIONAL_MARKERS:
+            self.assertIn(marker, html, f"Operational marker '{marker}' missing from superadmin dashboard render")
+
+        for marker in self.BUSINESS_MARKERS:
+            self.assertIn(marker, html, f"Business marker '{marker}' missing from superadmin dashboard render")
+
+
+# ---------------------------------------------------------------------------
+# UX-006 — Profile Banner & Completion Meter Integration
+# ---------------------------------------------------------------------------
+class TestUX006ProfileCompletionBanner(_AdminClientMixin, TestCase):
+    """Verify company completion banner elements and API integration."""
+
+    def test_dashboard_renders_completion_banner_elements(self):
+        c = Client()
+        r = c.get("/")
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode("utf-8")
+
+        # Visual banner and meter elements
+        self.assertIn('id="company-completion-banner"', html)
+        self.assertIn('id="completion-bar-fill"', html)
+        self.assertIn('id="completion-badge"', html)
+        self.assertIn('id="completion-guidance"', html)
+        self.assertIn('id="completion-cta-btn"', html)
+        self.assertIn('id="completion-cta-text"', html)
+
+        # JS integration functions
+        self.assertIn("loadCompanyCompletion()", html)
+        self.assertIn("renderCompanyCompletionBanner", html)
+
+    def test_authenticated_user_can_fetch_completion(self):
+        c = Client()
+        c.login(email=self.submitter.email, password="testpass123")
+        r = c.get("/api/company/completion/")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn("completion_pct", data)
+        self.assertIn("categories", data)
+
+    def test_superadmin_can_fetch_completion_with_param(self):
+        # Create a company profile to test with
+        company = CompanyProfile.objects.create(
+            name="PT Mitra Unggul",
+            nib="9120001234567",
+            modal_disetor=500000000,
+            penghasilan_tahunan=1000000000,
+        )
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        r = c.get(f"/api/company/completion/?company_id={company.id}")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn("completion_pct", data)
+        self.assertGreater(data["completion_pct"], 0)
+        self.assertEqual(data["categories"]["identitas"], 100)
+        self.assertEqual(data["categories"]["keuangan"], 100)
+
+
+class TestP2MobileResponsivePass(TestCase):
+    """
+    P2 — Responsive & Mobile Pass Acceptance Tests:
+    1. Zero cloneNode DOM duplication.
+    2. Single-state off-canvas drawer structure (#app-sidebar & #sidebar-backdrop).
+    3. Mobile responsive cards container (#results-cards-mobile) alongside desktop table.
+    4. Mobile card rendering functions and sync hooks.
+    5. Minimum 44x44px touch targets on mobile filter and pagination controls.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="mobile_user",
+            email="mobile_user@test.local",
+            password="testpass123",
+            role="operator",
+        )
+
+    def test_dashboard_has_no_clonenode(self):
+        c = Client()
+        c.login(email=self.user.email, password="testpass123")
+        response = c.get("/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertNotIn("cloneNode", content, "cloneNode must NOT be used for mobile sidebar drawer")
+
+    def test_off_canvas_drawer_elements_exist(self):
+        c = Client()
+        c.login(email=self.user.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+        self.assertIn('id="app-sidebar"', content)
+        self.assertIn('id="sidebar-backdrop"', content)
+        self.assertIn("mobile-open", content)
+        self.assertIn("toggleMobileSidebar", content)
+
+    def test_mobile_cards_container_exists(self):
+        c = Client()
+        c.login(email=self.user.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+        self.assertIn('id="results-cards-mobile"', content)
+        self.assertIn("renderMobileTenderCard", content)
+        self.assertIn("renderMobileRecommendedCard", content)
+
+    def test_touch_target_accessibility(self):
+        c = Client()
+        c.login(email=self.user.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+        # Header mobile filter button tap target >= 44px
+        self.assertIn("min-h-[44px]", content)
+        self.assertIn("min-w-[44px]", content)
+        # Prev / Next pagination buttons
+        self.assertIn('id="btn-prev"', content)
+        self.assertIn('id="btn-next"', content)
+
+
+class TestA11yMicrocopyPass(TestCase):
+    """
+    Accessibility (A11y) & Microcopy Pass Acceptance Tests:
+    1. Dialog accessibility: role="dialog", aria-modal="true", aria-labelledby, and accessible close buttons.
+    2. Tablist and tab accessibility: role="tablist", role="tab", dynamic aria-selected.
+    3. Visible keyboard focus outline: :focus-visible CSS styling.
+    4. Hierarchical Escape key handler: handleEscapeKey.
+    5. Indonesian microcopy consistency: Perbarui Data, Analisis AI, Kecocokan AI, SIAP, KOSONG, etc.
+    """
+
+    def setUp(self):
+        self.superadmin = User.objects.create_user(
+            username="super_a11y",
+            email="super_a11y@test.local",
+            password="testpass123",
+            role="superadmin",
+        )
+
+    def test_modals_dialog_aria_attributes(self):
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        response = c.get("/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        # Dialog attributes on static modals
+        self.assertIn('id="flush-modal" role="dialog" aria-modal="true" aria-labelledby="flush-modal-title"', content)
+        self.assertIn('id="kbli-modal" role="dialog" aria-modal="true" aria-labelledby="kbli-modal-title"', content)
+        self.assertIn('id="company-modal" role="dialog" aria-modal="true" aria-labelledby="company-modal-title"', content)
+        self.assertIn('id="tender-detail-modal" role="dialog" aria-modal="true" aria-labelledby="tdm-title"', content)
+
+        # Dynamic AI modal template in showAiModal
+        self.assertIn('id="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title"', content)
+
+        # Accessible close buttons with aria-label
+        self.assertIn('aria-label="Tutup dialog pembersihan"', content)
+        self.assertIn('aria-label="Tutup dialog KBLI"', content)
+        self.assertIn('aria-label="Tutup dialog profil perusahaan"', content)
+        self.assertIn('aria-label="Tutup detail tender"', content)
+        self.assertIn('aria-label="Tutup dialog kecocokan AI"', content)
+
+    def test_tabs_and_navigation_a11y(self):
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+
+        # Top navigation tabs
+        self.assertIn('role="tablist"', content)
+        self.assertIn('role="tab"', content)
+        self.assertIn('aria-selected="true"', content)
+        self.assertIn('aria-selected="false"', content)
+
+        # Mobile filter toggle button
+        self.assertIn('id="mobile-filter-btn"', content)
+        self.assertIn('aria-expanded="false"', content)
+        self.assertIn('aria-controls="app-sidebar"', content)
+
+        # Focus visible styling
+        self.assertIn(':focus-visible', content)
+        self.assertIn('outline: 2px solid', content)
+
+    def test_hierarchical_escape_key_handler(self):
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+
+        self.assertIn("function handleEscapeKey(e)", content)
+        self.assertIn("document.addEventListener('keydown', handleEscapeKey)", content)
+        self.assertIn("closeAiModal", content)
+        self.assertIn("closeTenderDetailModal", content)
+        self.assertIn("closeCompanyModal", content)
+        self.assertIn("closeKbliModal", content)
+        self.assertIn("closeFlushModal", content)
+        self.assertIn("toggleMobileSidebar(false)", content)
+
+    def test_microcopy_indonesian_consistency(self):
+        c = Client()
+        c.login(email=self.superadmin.email, password="testpass123")
+        response = c.get("/")
+        content = response.content.decode("utf-8")
+
+        # Standard Indonesian operational labels
+        self.assertIn("Perbarui Data", content)
+        self.assertIn("Sinkronisasi Otomatis", content)
+        self.assertIn("Pemantauan Sinkronisasi", content)
+        self.assertIn("Bersihkan Data Non-Aktif", content)
+        self.assertIn("Ringkasan Laporan", content)
+        self.assertIn("Analisis AI", content)
+        self.assertIn("Kecocokan AI", content)
+
+        # Absence of old mixed labels in active UI elements
+        self.assertNotIn(">Sync Data Baru<", content)
+        self.assertNotIn(">Auto Crawl<", content)
+        self.assertNotIn(">Monitoring Crawl<", content)
+        self.assertNotIn(">Report Summary<", content)
+        self.assertNotIn(">AI Analysis<", content)
+
+        # Readiness labels in JS
+        self.assertIn("READY: 'SIAP'", content)
+        self.assertIn("PARTIAL: 'SEBAGIAN'", content)
+        self.assertIn("NOT_READY: 'BELUM SIAP'", content)
+        self.assertIn("EMPTY: 'KOSONG'", content)
+
+
+# ---------------------------------------------------------------------------
+# F-03 — Hardened Mutation Endpoints CSRF Tests
+# ---------------------------------------------------------------------------
+class TestAiMatchRunCsrf(TestCase):
+    """Verify CSRF protection on api_match_run after @csrf_exempt removal."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.company = CompanyProfile.objects.create(
+            name="AI Match Test Company",
+            nib="NIB-AIMATCH-001",
+        )
+        cls.user = User.objects.create_user(
+            username="csrf_aimatch_user",
+            email="csrf_aimatch@test.local",
+            password="testpass123",
+            role="company_admin",
+            company=cls.company,
+        )
+        cls.tender = TenderResult.objects.create(
+            kode_instansi="101",
+            id_lelang="AIMATCH-T01",
+            nama_paket="Pengadaan Server AI",
+            instansi="Dinas Kominfo",
+            hps=500_000_000,
+            tahap_saat_ini="Pengumuman Pascakualifikasi",
+        )
+
+    def _login_enforcing_csrf(self):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email="csrf_aimatch@test.local", password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token, "CSRFTOKEN cookie not set")
+        return token.value
+
+    def test_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/match/run/",
+            json.dumps({"tender_id": self.tender.id, "force": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/match/run/",
+            json.dumps({"tender_id": self.tender.id, "force": True}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    @patch("spse_crawler.ai_match.views.run_match")
+    def test_valid_csrf_allows_match(self, mock_run_match):
+        mock_run_match.return_value = {
+            "fit_score": 90,
+            "status": "ready",
+            "summary": "Match found",
+        }
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            "/api/match/run/",
+            json.dumps({"tender_id": self.tender.id, "force": True}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn("result", data)
+        self.assertEqual(data["result"]["fit_score"], 90)
+
+
+class TestCompanyMutationCsrf(TestCase):
+    """Verify CSRF protection on api_company_create and api_company_update."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.superadmin = User.objects.create_user(
+            username="csrf_company_sa",
+            email="csrf_company_sa@test.local",
+            password="testpass123",
+            role="superadmin",
+            is_staff=True,
+            is_superuser=True,
+        )
+        cls.company = CompanyProfile.objects.create(
+            name="Existing Co",
+            nib="NIB-EXIST-001",
+        )
+
+    def _login_enforcing_csrf(self):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email="csrf_company_sa@test.local", password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token, "CSRFTOKEN cookie not set")
+        return token.value
+
+    def test_company_create_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/company/create/",
+            json.dumps({"name": "New Corp", "nib": "NIB-NEW-001"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_company_create_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/company/create/",
+            json.dumps({"name": "New Corp", "nib": "NIB-NEW-001"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_company_create_valid_csrf_success(self):
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            "/api/company/create/",
+            json.dumps({"name": "Brand New Corp", "nib": "NIB-NEW-002"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(CompanyProfile.objects.filter(nib="NIB-NEW-002").exists())
+
+    def test_company_update_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/update/",
+            json.dumps({"name": "Updated Name"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_company_update_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/update/",
+            json.dumps({"name": "Updated Name"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_company_update_valid_csrf_success(self):
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            f"/api/company/{self.company.id}/update/",
+            json.dumps({"name": "Updated Name Real"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        self.company.refresh_from_db()
+        self.assertEqual(self.company.name, "Updated Name Real")
+
+
+class TestQualificationMutationCsrf(TestCase):
+    """Verify CSRF protection on api_qualification_create, update, delete."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from spse_crawler.companies.models import CompanyQualification
+        cls.company = CompanyProfile.objects.create(
+            name="Qual Test Co",
+            nib="NIB-QUAL-001",
+        )
+        cls.user = User.objects.create_user(
+            username="csrf_qual_user",
+            email="csrf_qual@test.local",
+            password="testpass123",
+            role="company_admin",
+            company=cls.company,
+        )
+        cls.qual = CompanyQualification.objects.create(
+            company=cls.company,
+            category="izin_usaha",
+            name="NIB Izin Operasional",
+            number="12345",
+        )
+
+    def _login_enforcing_csrf(self):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email="csrf_qual@test.local", password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token, "CSRFTOKEN cookie not set")
+        return token.value
+
+    def test_qualification_create_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/create/",
+            json.dumps({"name": "SBU Konstruksi", "category": "sbu"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_create_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/create/",
+            json.dumps({"name": "SBU Konstruksi", "category": "sbu"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_create_valid_csrf_success(self):
+        from spse_crawler.companies.models import CompanyQualification
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/create/",
+            json.dumps({"name": "SBU Konstruksi", "category": "sbu", "number": "SBU-999"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(CompanyQualification.objects.filter(number="SBU-999").exists())
+
+    def test_qualification_update_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{self.qual.id}/update/",
+            json.dumps({"name": "Updated Izin Name"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_update_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{self.qual.id}/update/",
+            json.dumps({"name": "Updated Izin Name"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_update_valid_csrf_success(self):
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{self.qual.id}/update/",
+            json.dumps({"name": "Updated Izin Name Real"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        self.qual.refresh_from_db()
+        self.assertEqual(self.qual.name, "Updated Izin Name Real")
+
+    def test_qualification_delete_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{self.qual.id}/delete/",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_delete_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{self.qual.id}/delete/",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_qualification_delete_valid_csrf_success(self):
+        from spse_crawler.companies.models import CompanyQualification
+        temp_qual = CompanyQualification.objects.create(
+            company=self.company,
+            category="izin_usaha",
+            name="Temporary Qual",
+            number="TEMP-123",
+        )
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            f"/api/company/{self.company.id}/qualifications/{temp_qual.id}/delete/",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(CompanyQualification.objects.filter(id=temp_qual.id).exists())
+
+
+class TestWatchlistMutationCsrf(TestCase):
+    """Verify CSRF protection on api_watchlist_add and api_watchlist_remove."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from spse_crawler.web.models import TenderWatchlist
+        cls.company = CompanyProfile.objects.create(
+            name="Watchlist Test Co",
+            nib="NIB-WATCH-001",
+        )
+        cls.user = User.objects.create_user(
+            username="csrf_watch_user",
+            email="csrf_watch@test.local",
+            password="testpass123",
+            role="company_admin",
+            company=cls.company,
+        )
+        cls.tender = TenderResult.objects.create(
+            kode_instansi="102",
+            id_lelang="WATCH-T01",
+            nama_paket="Pengadaan Laptop Kantor",
+            instansi="Bappeda",
+            hps=200_000_000,
+            tahap_saat_ini="Tender Selesai",
+        )
+
+    def _login_enforcing_csrf(self):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email="csrf_watch@test.local", password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token, "CSRFTOKEN cookie not set")
+        return token.value
+
+    def test_watchlist_add_missing_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/watchlist/add/",
+            json.dumps({"tender_id": self.tender.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_watchlist_add_invalid_csrf_returns_403(self):
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/watchlist/add/",
+            json.dumps({"tender_id": self.tender.id}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_watchlist_add_valid_csrf_success(self):
+        from spse_crawler.web.models import TenderWatchlist
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            "/api/watchlist/add/",
+            json.dumps({"tender_id": self.tender.id, "notes": "Important tender"}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(TenderWatchlist.objects.filter(tender=self.tender, company=self.company).exists())
+
+    def test_watchlist_remove_missing_csrf_returns_403(self):
+        from spse_crawler.web.models import TenderWatchlist
+        w, _ = TenderWatchlist.objects.get_or_create(
+            company=self.company, tender=self.tender, defaults={"user": self.user}
+        )
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/watchlist/remove/",
+            json.dumps({"tender_id": self.tender.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_watchlist_remove_invalid_csrf_returns_403(self):
+        from spse_crawler.web.models import TenderWatchlist
+        w, _ = TenderWatchlist.objects.get_or_create(
+            company=self.company, tender=self.tender, defaults={"user": self.user}
+        )
+        c = self._login_enforcing_csrf()
+        r = c.post(
+            "/api/watchlist/remove/",
+            json.dumps({"tender_id": self.tender.id}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN="invalid-token",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_watchlist_remove_valid_csrf_success(self):
+        from spse_crawler.web.models import TenderWatchlist
+        w, _ = TenderWatchlist.objects.get_or_create(
+            company=self.company, tender=self.tender, defaults={"user": self.user}
+        )
+        c = self._login_enforcing_csrf()
+        token = self._get_csrf_token(c)
+        r = c.post(
+            "/api/watchlist/remove/",
+            json.dumps({"tender_id": self.tender.id}),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data["status"], "success")
+        self.assertFalse(TenderWatchlist.objects.filter(id=w.id).exists())
+
+
+class CrawlDeltaCsrfSecurityTests(TestCase):
+    """Verify CSRF protection and role-gating on /api/crawl-delta/."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.superadmin = User.objects.create_user(
+            username="delta_admin",
+            email="delta_admin@test.local",
+            password="testpass123",
+            role="superadmin",
+        )
+        cls.submitter = User.objects.create_user(
+            username="delta_submitter",
+            email="delta_submitter@test.local",
+            password="testpass123",
+            role="submitter",
+        )
+
+    def _login_client(self, email):
+        c = Client(enforce_csrf_checks=True)
+        c.login(email=email, password="testpass123")
+        return c
+
+    def _get_csrf_token(self, client):
+        client.get("/")
+        token = client.cookies.get("csrftoken")
+        self.assertIsNotNone(token)
+        return token.value
+
+    def test_unauthenticated_returns_401(self):
+        c = Client(enforce_csrf_checks=True)
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 401)
+
+    def test_submitter_returns_403(self):
+        c = self._login_client("delta_submitter@test.local")
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 403)
+
+    def test_missing_csrf_returns_403(self):
+        c = self._login_client("delta_admin@test.local")
+        r = c.post("/api/crawl-delta/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_invalid_csrf_returns_403(self):
+        c = self._login_client("delta_admin@test.local")
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN="invalid-token")
+        self.assertEqual(r.status_code, 403)
+
+    def test_valid_csrf_superadmin_succeeds(self):
+        c = self._login_client("delta_admin@test.local")
+        token = self._get_csrf_token(c)
+        r = c.post("/api/crawl-delta/", HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn(data.get("status"), ("started", "no_delta"))

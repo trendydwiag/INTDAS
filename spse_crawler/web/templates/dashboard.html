@@ -71,6 +71,7 @@
   </style>
 </head>
 <body class="h-full overflow-hidden">
+<div class="hidden" aria-hidden="true">{% csrf_token %}</div>
 
 <div class="flex h-full">
 
@@ -335,6 +336,13 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             <span id="crawl-btn-text">Perbarui Data</span>
             <span id="crawl-spinner" class="spinner hidden"></span>
+          </button>
+          <button onclick="startDeltaCrawl()" id="btn-crawl-delta"
+            title="Hanya mengambil ulang detail rincian untuk tender yang belum lengkap"
+            class="w-full px-3 py-2 text-xs font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white transition-colors flex items-center justify-center gap-2 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span id="crawl-delta-btn-text">Perkaya Data Delta</span>
+            <span id="crawl-delta-spinner" class="spinner hidden"></span>
           </button>
         </div>
         <div id="crawl-status" class="mt-2 text-[10px] text-slate-500 hidden"></div>
@@ -1165,6 +1173,13 @@ const state = {
 
 const csrftoken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 
+function getCsrfToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+    || document.cookie.match(/csrftoken=([^;]+)/)?.[1]
+    || csrftoken
+    || '';
+}
+
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1289,14 +1304,28 @@ function _handleSessionExpired() {
   }, 1500);
 }
 
-async function apiFetch(url, opts) {
+async function apiFetch(url, opts = {}) {
   if (_sessionExpired) {
     // Stop polling traffic after session expiry
     return new Response(null, { status: 401, statusText: 'session expired' });
   }
+
+  const method = (opts.method || 'GET').toUpperCase();
+  const headers = new Headers(opts.headers || {});
+  if (!headers.has('X-Requested-With')) {
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+  }
+  if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+    const token = getCsrfToken();
+    if (token && !headers.has('X-CSRFToken')) {
+      headers.set('X-CSRFToken', token);
+    }
+  }
+
+  const mergedOpts = { ...opts, headers };
   let resp;
   try {
-    resp = await fetch(url, opts);
+    resp = await fetch(url, mergedOpts);
   } catch (e) {
     showToast('Koneksi ke server gagal. Periksa jaringan Anda.', 'error');
     throw e;
@@ -1763,6 +1792,10 @@ async function startCrawl() {
 
     statusEl.className = 'mt-2 text-[10px] text-blue-600';
     statusEl.textContent = `Sinkronisasi berjalan: ${data.instansi_count || '?'} instansi, ${data.workers} pekerja`;
+    const monitorPanel = document.getElementById('monitor-panel');
+    if (monitorPanel && monitorPanel.classList.contains('hidden')) {
+      toggleMonitorPanel();
+    }
     pollCrawlStatus();
   } catch (e) {
     statusEl.className = 'mt-2 text-[10px] text-red-600';
@@ -1771,6 +1804,63 @@ async function startCrawl() {
     btn.disabled = false;
     spinner.classList.add('hidden');
     btnText.textContent = 'Perbarui Data';
+  }
+}
+
+async function startDeltaCrawl() {
+  const instansi = document.getElementById('crawl-instansi').value.trim() || 'all';
+  const btn = document.getElementById('btn-crawl-delta');
+  const btnText = document.getElementById('crawl-delta-btn-text');
+  const spinner = document.getElementById('crawl-delta-spinner');
+  const statusEl = document.getElementById('crawl-status');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  btnText.textContent = 'Menyiapkan Delta...';
+  statusEl.classList.remove('hidden');
+  statusEl.className = 'mt-2 text-[10px] text-amber-600';
+  statusEl.textContent = 'Menganalisis data delta yang belum lengkap...';
+
+  try {
+    const form = new URLSearchParams();
+    form.append('instansi', instansi);
+    form.append('workers', '3');
+
+    const resp = await apiFetch('/api/crawl-delta/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      statusEl.className = 'mt-2 text-[10px] text-red-600';
+      statusEl.textContent = 'Gagal: ' + (data.error || 'Terjadi kesalahan');
+      return;
+    }
+
+    if (data.status === 'no_delta') {
+      statusEl.className = 'mt-2 text-[10px] text-emerald-600';
+      statusEl.textContent = data.message || 'Semua data tender sudah lengkap.';
+      return;
+    }
+
+    statusEl.className = 'mt-2 text-[10px] text-blue-600';
+    statusEl.textContent = `Sinkronisasi delta berjalan: ${data.delta_count} tender diproses...`;
+    const monitorPanel = document.getElementById('monitor-panel');
+    if (monitorPanel && monitorPanel.classList.contains('hidden')) {
+      toggleMonitorPanel();
+    }
+    pollCrawlStatus();
+  } catch (e) {
+    statusEl.className = 'mt-2 text-[10px] text-red-600';
+    statusEl.textContent = 'Gagal menghubungi server: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    btnText.textContent = 'Perkaya Data Delta';
   }
 }
 
@@ -2498,9 +2588,9 @@ async function createCompanyProfile() {
   if (!name || !nib) { alert('Nama dan NIB wajib diisi'); return; }
 
   try {
-    const resp = await fetch('/api/company/create/', {
+    const resp = await apiFetch('/api/company/create/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, nib }),
     });
     const data = await resp.json();
@@ -2536,9 +2626,9 @@ async function saveCompanyProfile() {
   };
 
   try {
-    const resp = await fetch(`/api/company/${_companyId}/update/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/update/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await resp.json();
@@ -2556,7 +2646,7 @@ async function saveCompanyProfile() {
 
 async function loadQualifications(companyId) {
   try {
-    const resp = await fetch(`/api/company/${companyId}/qualifications/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    const resp = await apiFetch(`/api/company/${companyId}/qualifications/`);
     const data = await resp.json();
     _qualifications = data.items || [];
 
@@ -2724,9 +2814,9 @@ async function saveQualification() {
   }
 
   try {
-    const resp = await fetch(`/api/company/${_companyId}/qualifications/create/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/qualifications/create/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await resp.json();
@@ -2745,9 +2835,8 @@ async function saveQualification() {
 async function deleteQualification(qualId) {
   if (!confirm('Hapus kualifikasi ini?')) return;
   try {
-    const resp = await fetch(`/api/company/${_companyId}/qualifications/${qualId}/delete/`, {
+    const resp = await apiFetch(`/api/company/${_companyId}/qualifications/${qualId}/delete/`, {
       method: 'POST',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
     const data = await resp.json();
     if (data.status === 'success') {
@@ -2773,9 +2862,9 @@ async function runAiMatch(tenderId, tenderCode) {
   setStatusText('<span class="text-[10px] text-blue-500">Analyzing...</span>');
 
   try {
-    const resp = await fetch('/api/match/run/', {
+    const resp = await apiFetch('/api/match/run/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tender_id: tenderId, force: true }),
     });
     const data = await resp.json();
@@ -2927,17 +3016,19 @@ function renderTenderDetail(d) {
 
   // Jadwal table
   const jBody = document.getElementById('tdm-jadwal-body');
-  if (d.jadwal_json && d.jadwal_json.length) {
-    jBody.innerHTML = d.jadwal_json.map(j => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-3 py-1.5 text-slate-400">${esc(j.no)}</td>
-        <td class="px-3 py-1.5 font-medium text-slate-700">${esc(j.tahap)}</td>
-        <td class="px-3 py-1.5 text-slate-600">${esc(j.mulai)}</td>
-        <td class="px-3 py-1.5 text-slate-600">${esc(j.sampai)}</td>
-        <td class="px-3 py-1.5 text-slate-400">${esc(j.perubahan)}</td>
-      </tr>`).join('');
-  } else {
-    document.getElementById('tdm-jadwal').innerHTML = '<p class="text-[11px] text-slate-400 italic">Jadwal tidak tersedia</p>';
+  if (jBody) {
+    if (d.jadwal_json && d.jadwal_json.length) {
+      jBody.innerHTML = d.jadwal_json.map(j => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-1.5 text-slate-400">${esc(j.no)}</td>
+          <td class="px-3 py-1.5 font-medium text-slate-700">${esc(j.tahap)}</td>
+          <td class="px-3 py-1.5 text-slate-600">${esc(j.mulai)}</td>
+          <td class="px-3 py-1.5 text-slate-600">${esc(j.sampai)}</td>
+          <td class="px-3 py-1.5 text-slate-400">${esc(j.perubahan)}</td>
+        </tr>`).join('');
+    } else {
+      jBody.innerHTML = '<tr><td colspan="5" class="px-3 py-2 text-[11px] text-slate-400 italic text-center">Jadwal tidak tersedia</td></tr>';
+    }
   }
 
   // Syarat kualifikasi
@@ -3032,9 +3123,9 @@ async function runAiMatchFromModal() {
   content.innerHTML = '<span class="text-[11px] text-blue-500">Analyzing...</span>';
   document.getElementById('tdm-ai-section').classList.remove('hidden');
   try {
-    const resp = await fetch('/api/match/run/', {
+    const resp = await apiFetch('/api/match/run/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tender_id: _tdmCurrentId, force: true }),
     });
     const data = await resp.json();
@@ -3143,6 +3234,9 @@ function renderSubmissionActions(djangoId, sub) {
     const color = currentStatus === 'menang' ? 'emerald' : 'red';
     const label = currentStatus === 'menang' ? 'Berhasil Menang Tender' : 'Gagal Menang Tender';
     html += '<div class="text-[11px] text-' + color + '-600 font-medium">' + label + '</div>';
+    if (sub && sub.notes) {
+      html += '<div class="mt-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2"><span class="font-semibold text-slate-700">Catatan:</span> ' + esc(sub.notes) + '</div>';
+    }
   } else {
     html += '<button onclick="updateSubmission(' + djangoId + ', \'sudah_submit\')" class="w-full px-3 py-2 text-[11px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center justify-center gap-2">';
     html += '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';

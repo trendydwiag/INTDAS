@@ -535,12 +535,10 @@ class DetailParser:
         return count
 
     def _parse_participants(self, html: str) -> list[dict]:
-        """Extract participant name + NPWP from the /peserta page table.
+        """Extract participant name, NPWP, and evaluation note from /peserta table.
 
-        Row layout is ``[No, Nama, NPWP, ...]`` per the existing count logic.
-        Only rows with a numeric index whose name cell is non-empty are kept;
-        this captures the participant company name and its external NPWP without
-        inventing identity. Data is treated as external (not auto-linked).
+        Row layout is ``[No, Nama, NPWP, ...]``. Extra columns (penawaran,
+        nilai evaluasi, alasan gugur/tidak lulus) are captured when present.
         """
         tree = HTMLParser(html)
         participants: list[dict] = []
@@ -556,7 +554,37 @@ class DetailParser:
             npwp = (cells[2].text() or "").strip()
             if not name:
                 continue
-            participants.append({"name": name, "npwp": npwp})
+
+            alasan = ""
+            nilai = ""
+            for i in range(3, len(cells)):
+                txt = (cells[i].text() or "").strip()
+                if not txt:
+                    continue
+                txt_lower = txt.lower()
+                if any(
+                    kw in txt_lower
+                    for kw in [
+                        "tidak lulus",
+                        "gugur",
+                        "ambang batas",
+                        "memenuhi",
+                        "tidak memenuhi",
+                        "diskualifikasi",
+                        "alasan",
+                        "keterangan",
+                    ]
+                ) or len(txt) > 25:
+                    alasan = txt if not alasan else f"{alasan}; {txt}"
+                elif re.search(r"^\d+([.,]\d+)?$", txt) and not nilai:
+                    nilai = txt
+
+            p_data: dict[str, str] = {"name": name, "npwp": npwp}
+            if alasan:
+                p_data["alasan"] = alasan
+            if nilai:
+                p_data["nilai"] = nilai
+            participants.append(p_data)
         return participants
 
     # ------------------------------------------------------------------
