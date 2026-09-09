@@ -978,6 +978,7 @@ class DetailParser:
     async def scrape_detail(
         self,
         package: TenderPackage,
+        bypass_tahap_gate: bool = False,
     ) -> TenderDetail:
         """Scrape the detail page for a single tender package.
 
@@ -1035,7 +1036,7 @@ class DetailParser:
         # Phase 5: awarded tenders are retained (not dropped) so participant and
         # future winner data can be captured. Aborted (cancelled/failed) tenders
         # and unrecognised tahap are still skipped.
-        if not self.is_eligible_tahap(tahap) and not self.is_retained_tahap(tahap):
+        if not bypass_tahap_gate and not self.is_eligible_tahap(tahap) and not self.is_retained_tahap(tahap):
             logger.info(
                 "[{}/{}] [SKIP] Tahap '{}' — non-aktif / bukan prakualifikasi",
                 package.kode_instansi, package.id_lelang, tahap,

@@ -1149,11 +1149,15 @@
     </div>
     <!-- Footer -->
     <div class="px-4 py-3 md:px-6 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center flex-wrap gap-2">
         <a id="tdm-link-lpse" href="#" target="_blank" rel="noreferrer" class="text-[11px] text-blue-600 hover:underline font-medium">Buka di LPSE &rarr;</a>
         <button onclick="toggleWatchlist()" id="tdm-btn-watchlist" class="px-3 py-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors flex items-center gap-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
           <span id="watchlist-btn-text">Watchlist</span>
+        </button>
+        <button onclick="resyncCurrentTender()" id="tdm-btn-resync" class="px-3 py-1.5 text-[11px] font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors flex items-center gap-1.5" title="Sinkronkan ulang detail, jadwal, dan peserta tender langsung dari LPSE">
+          <svg id="tdm-resync-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span id="tdm-resync-text">Sinkronkan Ulang</span>
         </button>
       </div>
       <div class="flex gap-2">
@@ -3421,6 +3425,71 @@ async function toggleWatchlist() {
         loadWatchlist();
       }
     } catch (e) { console.error(e); }
+  }
+}
+
+let _isResyncing = false;
+
+async function resyncCurrentTender() {
+  if (!_tdmCurrentId || _isResyncing) return;
+  const btn = document.getElementById('tdm-btn-resync');
+  const icon = document.getElementById('tdm-resync-icon');
+  const textEl = document.getElementById('tdm-resync-text');
+
+  _isResyncing = true;
+  btn.disabled = true;
+  btn.classList.add('opacity-75', 'cursor-not-allowed');
+  icon.classList.add('animate-spin');
+  textEl.textContent = 'Menyinkronkan...';
+
+  try {
+    const resp = await apiFetch(`/api/tenders/${_tdmCurrentId}/resync/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await resp.json();
+
+    if (resp.status === 401) {
+      textEl.textContent = 'Perlu Login';
+      alert('Silakan login terlebih dahulu untuk menyinkronkan data.');
+      return;
+    }
+
+    if (!resp.ok || data.error) {
+      textEl.textContent = 'Gagal';
+      alert('Gagal menyinkronkan data: ' + (data.error || 'Terjadi kesalahan pada server'));
+      return;
+    }
+
+    // Perbarui tampilan detail tender dengan data terbaru
+    if (data.tender) {
+      renderTenderDetail(data.tender);
+    }
+    loadCompetitionIntelligence(_tdmCurrentId);
+    loadOpportunityScore(_tdmCurrentId);
+    loadTdmSubmissionStatus(_tdmCurrentId);
+
+    // Refresh daftar tabel utama jika ada
+    if (typeof loadResults === 'function') {
+      loadResults(state.currentPage || 1);
+    }
+
+    textEl.textContent = 'Tersinkron!';
+    setTimeout(() => {
+      textEl.textContent = 'Sinkronkan Ulang';
+    }, 2500);
+  } catch (e) {
+    console.error('Resync failed:', e);
+    textEl.textContent = 'Gagal';
+    alert('Gagal terhubung ke server: ' + (e.message || 'Koneksi terputus'));
+    setTimeout(() => {
+      textEl.textContent = 'Sinkronkan Ulang';
+    }, 2500);
+  } finally {
+    _isResyncing = false;
+    btn.disabled = false;
+    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+    icon.classList.remove('animate-spin');
   }
 }
 

@@ -495,17 +495,9 @@ def api_results(request):
     })
 
 
-@require_GET
-def api_tender_detail(request, pk):
-    """Return full detail for a single tender by Django PK."""
-    try:
-        t = TenderResult.objects.get(pk=pk)
-    except TenderResult.DoesNotExist:
-        return JsonResponse({"error": "Tender tidak ditemukan"}, status=404)
-
+def _serialize_tender_detail(t: TenderResult) -> dict:
     display_date = t.tanggal_dibuat or t.scraped_at
-
-    return JsonResponse({
+    return {
         "id": t.id,
         "kode_instansi": t.kode_instansi,
         "id_lelang": t.id_lelang,
@@ -534,6 +526,119 @@ def api_tender_detail(request, pk):
         # AI persistence fields
         "ai_score": t.ai_score,
         "ai_analysis_json": t.ai_analysis_json or {},
+    }
+
+
+@require_GET
+def api_tender_detail(request, pk):
+    """Return full detail for a single tender by Django PK."""
+    try:
+        t = TenderResult.objects.get(pk=pk)
+    except TenderResult.DoesNotExist:
+        return JsonResponse({"error": "Tender tidak ditemukan"}, status=404)
+
+    return JsonResponse(_serialize_tender_detail(t))
+
+
+async def _execute_single_resync(tender_id: int) -> tuple[bool, str, TenderResult]:
+    from spse_crawler.core.browser import SpseHttpClient
+    from spse_crawler.parsers.detail import DetailParser
+    from spse_crawler.models.tender import TenderPackage
+    from spse_crawler.config import get_settings
+
+    t = await sync_to_async(TenderResult.objects.get)(id=tender_id)
+    pkg = TenderPackage(
+        kode_instansi=t.kode_instansi,
+        id_lelang=t.id_lelang,
+        nama_paket=t.nama_paket,
+        instansi=t.instansi,
+        hps=t.hps,
+        jenis_pengadaan=t.jenis_pengadaan,
+        tahap_saat_ini=t.tahap_saat_ini,
+    )
+    settings = get_settings()
+    async with SpseHttpClient(settings) as http:
+        detail_parser = DetailParser(http, settings=settings)
+        detail = await detail_parser.scrape_detail(pkg, bypass_tahap_gate=True)
+        if detail is None:
+            return False, "Tidak dapat mengambil data dari LPSE", t
+
+        if detail.tahap_saat_ini:
+            t.tahap_saat_ini = detail.tahap_saat_ini
+            t.is_prakualifikasi = detail_parser.is_eligible_tahap(detail.tahap_saat_ini)
+        if detail.satuan_kerja_detail:
+            t.satuan_kerja_detail = detail.satuan_kerja_detail
+        if detail.syarat_kualifikasi:
+            t.syarat_kualifikasi = detail.syarat_kualifikasi
+        if detail.jadwal_json:
+            t.jadwal_json = detail.jadwal_json
+        if detail.peserta_count is not None:
+            t.peserta_count = detail.peserta_count
+        if detail.lokasi_pekerjaan:
+            t.lokasi_pekerjaan = detail.lokasi_pekerjaan
+        if detail.metode_pengadaan:
+            t.metode_pengadaan = detail.metode_pengadaan
+        if detail.tahun_anggaran:
+            t.tahun_anggaran = detail.tahun_anggaran
+        if detail.requirement_text:
+            t.requirement_text = detail.requirement_text
+        if detail.kbli_code:
+            t.kbli_code = detail.kbli_code
+        if detail.kbli_description:
+            t.kbli_description = detail.kbli_description
+        t.scraped_at = dj_timezone.now()
+        await sync_to_async(t.save)()
+
+        if detail.participants:
+            await sync_to_async(sync_tender_participants)(
+                t,
+                detail.participants,
+                source_url=detail.url_pengumuman,
+                source_fetched_at=detail.scraped_at,
+            )
+        if detail.winner:
+            await sync_to_async(sync_tender_winner)(
+                t,
+                detail.winner,
+                source_url=detail.winner_source_url,
+                source_fetched_at=detail.scraped_at,
+            )
+    return True, "Data tender berhasil disinkronkan dari LPSE", t
+
+
+def _run_coroutine_sync(coro):
+    """Run an async coroutine synchronously, safely handling existing or absent event loops."""
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(lambda: asyncio.run(coro))
+        return future.result(timeout=120)
+
+
+@require_POST
+def api_tender_resync(request, pk):
+    """Re-scrape detail, participants, and winner for a single tender from LPSE."""
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return JsonResponse({"error": "Autentikasi diperlukan"}, status=401)
+
+    try:
+        t = TenderResult.objects.get(pk=pk)
+    except TenderResult.DoesNotExist:
+        return JsonResponse({"error": "Tender tidak ditemukan"}, status=404)
+
+    try:
+        success, message, updated_tender = _run_coroutine_sync(_execute_single_resync(t.id))
+    except Exception as exc:
+        logger.error("[RESYNC_TENDER] Error resyncing tender pk={}: {}", pk, exc)
+        return JsonResponse({"error": f"Gagal menyinkronkan data tender: {exc}"}, status=500)
+
+    if not success:
+        return JsonResponse({"error": message}, status=502)
+
+    return JsonResponse({
+        "status": "success",
+        "message": message,
+        "tender": _serialize_tender_detail(updated_tender),
     })
 
 
