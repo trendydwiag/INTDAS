@@ -175,6 +175,11 @@ class TenderDetail(BaseModel):
         default_factory=list,
         description="Jadwal tahapan: [{no, tahap, mulai, sampai, perubahan}]",
     )
+
+    @property
+    def jadwal(self) -> list[dict]:
+        """Alias for jadwal_json to prevent attribute errors."""
+        return self.jadwal_json
     syarat_kualifikasi: str = Field(
         default="",
         description="Cleaned qualification requirement text.",

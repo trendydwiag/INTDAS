@@ -824,8 +824,8 @@ async def _execute_delta_crawl(tender_ids: list[int], workers: int, instansi_inp
                                 t.satuan_kerja_detail = detail.satuan_kerja_detail
                             if detail.syarat_kualifikasi:
                                 t.syarat_kualifikasi = detail.syarat_kualifikasi
-                            if detail.jadwal:
-                                t.jadwal_json = detail.jadwal
+                            if detail.jadwal_json:
+                                t.jadwal_json = detail.jadwal_json
                             if detail.peserta_count:
                                 t.peserta_count = detail.peserta_count
                             if detail.lokasi_pekerjaan:
