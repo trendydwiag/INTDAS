@@ -2067,14 +2067,64 @@ function formatDuration(seconds) {
 
 /* ===== SCHEDULER ===== */
 async function toggleScheduler() {
+  const btn = document.getElementById('btn-scheduler');
+  const dot = btn ? btn.querySelector('span') : null;
+
+  const wasRunning = btn && btn.classList.contains('bg-blue-600');
+  const willRun = !wasRunning;
+
+  // Optimistic UI update
+  if (btn && dot) {
+    if (willRun) {
+      btn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors bg-blue-600';
+      dot.className = 'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform translate-x-4';
+    } else {
+      btn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors bg-slate-300';
+      dot.className = 'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform translate-x-1';
+    }
+  }
+
   try {
-    await fetch('/api/status/toggle/', {
+    const resp = await fetch('/api/status/toggle/', {
       method: 'POST',
-      headers: { 'X-CSRFToken': csrftoken },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
     });
-    location.reload();
+
+    if (!resp.ok) {
+      alert('Gagal mengubah status sinkronisasi otomatis. Pastikan Anda memiliki hak akses Superadmin.');
+      location.reload();
+      return;
+    }
+
+    const data = await resp.json();
+    const isRunning = !!data.scheduler_running;
+
+    if (btn && dot) {
+      if (isRunning) {
+        btn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors bg-blue-600';
+        dot.className = 'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform translate-x-4';
+      } else {
+        btn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors bg-slate-300';
+        dot.className = 'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform translate-x-1';
+      }
+    }
+
+    if (isRunning) {
+      const monitorPanel = document.getElementById('monitor-panel');
+      const toggleText = document.getElementById('monitor-toggle-text');
+      if (monitorPanel && monitorPanel.classList.contains('hidden')) {
+        monitorPanel.classList.remove('hidden');
+        if (toggleText) toggleText.textContent = 'Sembunyikan';
+      }
+      setTimeout(pollCrawlStatus, 800);
+    }
   } catch (e) {
     console.error('Failed to toggle scheduler:', e);
+    location.reload();
   }
 }
 

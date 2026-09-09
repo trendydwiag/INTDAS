@@ -31,7 +31,7 @@ from spse_crawler.services.tender_participant_store import sync_tender_participa
 from spse_crawler.services.tender_winner_store import sync_tender_winner
 
 from .models import CrawlJob, KbliMaster, TenderResult
-from .scheduler import get_scheduler, start_scheduler, stop_scheduler, trigger_now
+from .scheduler import get_scheduler, is_scheduler_enabled, start_scheduler, stop_scheduler, trigger_now
 
 
 # ---------------------------------------------------------------------------
@@ -442,8 +442,7 @@ def _get_global_queryset(request):
 
 
 def dashboard(request):
-    scheduler = get_scheduler()
-    scheduler_running = scheduler.running and len(scheduler.get_jobs()) > 0
+    scheduler_running = is_scheduler_enabled()
     kbli_items = list(KbliMaster.objects.filter(is_active=True).values_list("code", "name"))
     return render(request, "dashboard.html", {
         "scheduler_running": scheduler_running,
@@ -1131,9 +1130,11 @@ def api_status(request):
         j["started_at"] = j["started_at"].isoformat() if j["started_at"] else ""
         j["finished_at"] = j["finished_at"].isoformat() if j["finished_at"] else ""
 
+    crawl_running = _crawl_lock.locked() or CrawlJob.objects.filter(status="running").exists()
+
     return JsonResponse({
-        "scheduler_running": scheduler.running,
-        "crawl_in_progress": _crawl_lock.locked(),
+        "scheduler_running": is_scheduler_enabled(),
+        "crawl_in_progress": crawl_running,
         "progress": progress.get_progress(),
         "recent_jobs": jobs,
     })
@@ -1148,8 +1149,7 @@ def api_crawl_progress(request):
 
 @require_superadmin
 def api_toggle_scheduler(request):
-    scheduler = get_scheduler()
-    if scheduler.running:
+    if is_scheduler_enabled():
         stop_scheduler()
         return JsonResponse({"scheduler_running": False})
     else:

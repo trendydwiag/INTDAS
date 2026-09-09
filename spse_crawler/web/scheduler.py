@@ -8,6 +8,10 @@ import threading
 import traceback
 from datetime import datetime, timezone
 
+import json
+from pathlib import Path
+from django.conf import settings
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from django.utils import timezone as dj_timezone
@@ -18,6 +22,47 @@ from spse_crawler.config.settings import INSTANSI_CODES, InstansiConfig, get_set
 _scheduler: BackgroundScheduler | None = None
 
 
+def _get_state_file() -> Path:
+    """Return the persistent scheduler state file path."""
+    base_dir = getattr(settings, "BASE_DIR", Path("."))
+    data_dir = Path(base_dir) / "data"
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    return data_dir / "scheduler_state.json"
+
+
+def is_scheduler_enabled() -> bool:
+    """Check whether scheduler is enabled across all processes."""
+    state_file = _get_state_file()
+    try:
+        if state_file.exists():
+            with open(state_file, "r") as f:
+                data = json.load(f)
+                return bool(data.get("enabled", False))
+    except Exception as e:
+        logger.debug("[SCHEDULER] Failed to read scheduler state: {}", e)
+    return False
+
+
+def set_scheduler_enabled(enabled: bool) -> None:
+    """Persist scheduler enabled state across all worker processes."""
+    state_file = _get_state_file()
+    try:
+        data = {
+            "enabled": bool(enabled),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        tmp_file = state_file.parent / f"scheduler_state.tmp.{os.getpid()}"
+        with open(tmp_file, "w") as f:
+            json.dump(data, f)
+        tmp_file.replace(state_file)
+        logger.info("[SCHEDULER] Persistent scheduler state set to: {}", enabled)
+    except Exception as e:
+        logger.error("[SCHEDULER] Failed to write scheduler state: {}", e)
+
+
 def get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
@@ -26,17 +71,23 @@ def get_scheduler() -> BackgroundScheduler:
 
 
 def start_scheduler() -> None:
+    set_scheduler_enabled(True)
     scheduler = get_scheduler()
     if scheduler.running:
+        try:
+            scheduler.modify_job("hourly_crawl", next_run_time=datetime.now(timezone.utc))
+        except Exception:
+            pass
         return
 
+    # Trigger immediately upon starting, then every 3 hours
     scheduler.add_job(
         func=_run_background_crawl,
         trigger=IntervalTrigger(hours=3),
         id="hourly_crawl",
         name="SPSE Crawl (Every 3 Hours)",
         replace_existing=True,
-        next_run_time=None,
+        next_run_time=datetime.now(timezone.utc),
     )
     # Intelligence pipeline — process queued AI Match / Opportunity Score jobs.
     scheduler.add_job(
@@ -52,6 +103,7 @@ def start_scheduler() -> None:
 
 
 def stop_scheduler() -> None:
+    set_scheduler_enabled(False)
     scheduler = get_scheduler()
     if scheduler.running:
         scheduler.shutdown(wait=False)
@@ -75,6 +127,10 @@ def trigger_pipeline_now() -> None:
 
 
 def _run_background_crawl() -> None:
+    if not is_scheduler_enabled():
+        logger.info("[SCHEDULER] Scheduler is marked disabled in persistent state — skipping tick")
+        return
+
     from .views import _crawl_lock
     if not _crawl_lock.acquire(blocking=False):
         logger.warning("[SCHEDULER] Crawl already in progress — skipping")
@@ -84,6 +140,11 @@ def _run_background_crawl() -> None:
         import django
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "web_ui.settings")
         django.setup()
+
+        from spse_crawler.web.models import CrawlJob
+        if CrawlJob.objects.filter(status="running").exists():
+            logger.warning("[SCHEDULER] Another crawl job is already running in the database — skipping")
+            return
 
         logger.info("[SCHEDULER] Starting background crawl...")
         loop = asyncio.new_event_loop()
