@@ -268,3 +268,25 @@ class AIMatchEligibilityTests(TestCase):
         self.assertIn("missing_requirements", item)
         self.assertIn("recommended_actions", item)
         self.assertEqual(item["matcher_version"], MATCHER_VERSION)
+
+    def test_10_submittable_stages_eligible_for_ai_match(self):
+        """Test 10: Tenders in download dokumen, penjelasan, and kirim stages are eligible for AI match."""
+        active_stages = [
+            "Download Dokumen Pemilihan [...]",
+            "Download Dokumen Kualifikasi",
+            "Penjelasan Dokumen Prakualifikasi",
+            "Pemberian Penjelasan [...]",
+            "Kirim Persyaratan Kualifikasi",
+            "Pemasukan Dokumen Kualifikasi",
+        ]
+        for stage in active_stages:
+            self.tender.tahap_saat_ini = stage
+            self.tender.save(update_fields=["tahap_saat_ini"])
+            result = run_match(tender_id=self.tender.id, company_id=self.company.id, force=True)
+            self.assertNotEqual(
+                result["eligibility_status"],
+                "NOT_APPLICABLE",
+                f"Stage '{stage}' should be submittable and eligible for AI match",
+            )
+            self.assertEqual(result["eligibility_status"], "ELIGIBLE")
+

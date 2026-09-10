@@ -85,6 +85,30 @@ class TenderStatusNormalizationTests(TestCase):
         self.assertFalse(is_submittable_tender(""))
         self.assertFalse(is_submittable_tender("   "))
 
+    def test_download_dokumen_stages(self):
+        self.assertTrue(is_submittable_tender("Download Dokumen Kualifikasi"))
+        self.assertTrue(is_submittable_tender("Download Dokumen Pemilihan [...]"))
+        self.assertTrue(is_submittable_tender("Unduh Dokumen Kualifikasi"))
+        self.assertTrue(is_submittable_tender("Pengambilan Dokumen Kualifikasi"))
+
+    def test_penjelasan_dokumen_stages(self):
+        self.assertTrue(is_submittable_tender("Penjelasan Dokumen Prakualifikasi"))
+        self.assertTrue(is_submittable_tender("Pemberian Penjelasan [...]"))
+        self.assertTrue(is_submittable_tender("Penjelasan Dokumen Pemilihan"))
+        self.assertTrue(is_submittable_tender("Aanwijzing"))
+
+    def test_kirim_persyaratan_stages(self):
+        self.assertTrue(is_submittable_tender("Kirim Persyaratan Kualifikasi"))
+        self.assertTrue(is_submittable_tender("Kirim Data Kualifikasi [...]"))
+        self.assertTrue(is_submittable_tender("Pemasukan Dokumen Kualifikasi"))
+        self.assertTrue(is_submittable_tender("Penyampaian Dokumen Kualifikasi"))
+
+    def test_post_submission_stages_excluded(self):
+        self.assertFalse(is_submittable_tender("Pengumuman Hasil Prakualifikasi"))
+        self.assertFalse(is_submittable_tender("Pembuktian Kualifikasi"))
+        self.assertFalse(is_submittable_tender("Evaluasi Kualifikasi"))
+        self.assertFalse(is_submittable_tender("Sanggahan Prakualifikasi"))
+
     def test_tender_object_dispatch(self):
         tender_active = TenderResult.objects.create(
             kode_instansi="test_inst",

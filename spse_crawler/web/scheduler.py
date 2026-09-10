@@ -192,10 +192,10 @@ async def _do_crawl() -> None:
     from spse_crawler.services.tender_winner_store import sync_tender_winner
     from spse_crawler.web.models import CrawlJob, TenderResult
 
-    _create_job = sync_to_async(CrawlJob.objects.create)
-    _update_or_create = sync_to_async(TenderResult.objects.update_or_create)
-    _sync_participants = sync_to_async(sync_tender_participants)
-    _sync_winner = sync_to_async(sync_tender_winner)
+    _create_job = sync_to_async(CrawlJob.objects.create, thread_sensitive=False)
+    _update_or_create = sync_to_async(TenderResult.objects.update_or_create, thread_sensitive=False)
+    _sync_participants = sync_to_async(sync_tender_participants, thread_sensitive=False)
+    _sync_winner = sync_to_async(sync_tender_winner, thread_sensitive=False)
 
     settings = get_settings()
     worker_count = 3
@@ -371,7 +371,7 @@ async def _do_crawl() -> None:
         if detail_parser is not None:
             await detail_parser.close()
 
-        @sync_to_async
+        @sync_to_async(thread_sensitive=False)
         def _finish_job():
             job.status = "completed"
             job.total_packages = total
@@ -388,7 +388,7 @@ async def _do_crawl() -> None:
         # (Phase 6A — historical retention). See flush_non_retained().
         # Completed ("selesai") tenders without active submissions are purged
         # by purge_completed_tenders() — they are garbage data.
-        @sync_to_async
+        @sync_to_async(thread_sensitive=False)
         def _auto_purge():
             from spse_crawler.services.purger import flush_non_retained, purge_completed_tenders
             result = flush_non_retained()
@@ -401,7 +401,7 @@ async def _do_crawl() -> None:
         await _auto_purge()
 
         # Post-crawl: enqueue newly discovered active tenders for intelligence.
-        @sync_to_async
+        @sync_to_async(thread_sensitive=False)
         def _enqueue_intelligence():
             from spse_crawler.services.intelligence_pipeline import (
                 enqueue_new_after_crawl,
@@ -414,7 +414,7 @@ async def _do_crawl() -> None:
         await _enqueue_intelligence()
 
     except Exception as exc:
-        @sync_to_async
+        @sync_to_async(thread_sensitive=False)
         def _fail_job():
             job.status = "failed"
             job.error_message = str(exc)

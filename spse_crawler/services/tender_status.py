@@ -14,8 +14,61 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# Canonical active status constant
+# Canonical active status constant (retained for backward-compatibility)
 CANONICAL_ACTIVE_STATUS: str = "pengumuman prakualifikasi"
+
+# Canonical submittable stage categories (active submission window)
+SUBMITTABLE_STAGE_KEYWORDS: tuple[str, ...] = (
+    # 1. Pengumuman
+    "pengumuman prakualifikasi",
+    "pengumuman pra-kualifikasi",
+    "pengumuman kualifikasi",
+    "pengumuman pemilihan",
+    # 2. Download / Unduh Dokumen
+    "download dokumen kualifikasi",
+    "download dokumen pemilihan",
+    "download dokumen prakualifikasi",
+    "unduh dokumen kualifikasi",
+    "unduh dokumen pemilihan",
+    "unduh dokumen prakualifikasi",
+    "pengambilan dokumen kualifikasi",
+    "pengambilan dokumen pemilihan",
+    # 3. Penjelasan Dokumen (Aanwijzing)
+    "penjelasan dokumen prakualifikasi",
+    "penjelasan dokumen kualifikasi",
+    "penjelasan dokumen pemilihan",
+    "pemberian penjelasan",
+    "aanwijzing",
+    # 4. Kirim Persyaratan / Data / Pemasukan Dokumen
+    "kirim persyaratan kualifikasi",
+    "kirim data kualifikasi",
+    "kirim dokumen kualifikasi",
+    "kirim penawaran",
+    "pemasukan dokumen kualifikasi",
+    "pemasukan kualifikasi",
+    "pemasukan data kualifikasi",
+    "pemasukan dokumen penawaran",
+    "penyampaian dokumen kualifikasi",
+    "penyampaian kualifikasi",
+    "penyampaian data kualifikasi",
+    "upload dokumen kualifikasi",
+    "upload dokumen penawaran",
+)
+
+# Stages that are past submission window or closed/aborted
+NON_SUBMITTABLE_KEYWORDS: tuple[str, ...] = (
+    "evaluasi",
+    "pembuktian",
+    "hasil",
+    "sanggah",
+    "pemenang",
+    "kontrak",
+    "selesai",
+    "batal",
+    "gagal",
+    "lelang ulang",
+    "tender ulang",
+)
 
 
 def normalize_tahap(tahap: Any) -> str:
@@ -50,9 +103,15 @@ def normalize_tahap(tahap: Any) -> str:
 def is_submittable_tender(tender_or_tahap: Any) -> bool:
     """Check whether a tender or raw tahap string represents an active/submittable tender.
 
-    Strict equality against CANONICAL_ACTIVE_STATUS after normalization.
-    NO fuzzy matching (no substring/startswith).
-    Only 'pengumuman prakualifikasi' returns True.
+    Submittable stages include:
+      1. Pengumuman Prakualifikasi / Pemilihan
+      2. Download / Unduh Dokumen Kualifikasi / Dokumen Pemilihan
+      3. Penjelasan Dokumen (Pemberian Penjelasan / Aanwijzing)
+      4. Kirim Persyaratan / Data Kualifikasi / Pemasukan Dokumen Kualifikasi
+
+    Excluded stages include:
+      Evaluasi, Pembuktian Kualifikasi, Pengumuman Hasil, Sanggahan,
+      Penetapan/Pengumuman Pemenang, Kontrak, Selesai, Batal, Gagal.
     """
     if tender_or_tahap is None:
         return False
@@ -65,4 +124,13 @@ def is_submittable_tender(tender_or_tahap: Any) -> bool:
     if not raw_tahap:
         return False
 
-    return normalize_tahap(raw_tahap) == CANONICAL_ACTIVE_STATUS
+    norm = normalize_tahap(raw_tahap)
+    if not norm:
+        return False
+
+    # Hard rejection: excluded stages (evaluasi, pemenang, kontrak, selesai, batal, etc.)
+    if any(kw in norm for kw in NON_SUBMITTABLE_KEYWORDS):
+        return False
+
+    # Check if normalized tahap matches any submittable stage keywords
+    return any(kw in norm for kw in SUBMITTABLE_STAGE_KEYWORDS)
