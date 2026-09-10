@@ -106,3 +106,4 @@ class DetailParserBypassTahapGateTestCase(TestCase):
         detail = await parser.scrape_detail(pkg, bypass_tahap_gate=True)
         self.assertIsNotNone(detail)
         self.assertEqual(detail.id_lelang, "10161819000")
+

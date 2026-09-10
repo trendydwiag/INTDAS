@@ -450,7 +450,8 @@ class DetailParser:
 
     def _extract_lokasi_pekerjaan(self, html: str) -> str:
         """Extract work location from the detail page."""
-        return self._extract_table_value(html, ("lokasi pekerjaan", "lokasi"))
+        val = self._extract_table_value(html, ("lokasi pekerjaan", "lokasi"))
+        return re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", val)).strip()
 
     def _extract_metode_pengadaan(self, html: str) -> str:
         """Extract procurement method from the detail page."""

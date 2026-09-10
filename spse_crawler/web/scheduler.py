@@ -241,31 +241,62 @@ async def _do_crawl() -> None:
                                     nama_paket=detail.nama_paket,
                                     jenis_pengadaan=detail.jenis_pengadaan,
                                 )
-                                tender_obj, _ = await _update_or_create(
-                                    kode_instansi=detail.kode_instansi,
-                                    id_lelang=detail.id_lelang,
-                                    defaults={
-                                        "nama_paket": detail.nama_paket,
-                                        "instansi": detail.instansi,
-                                        "hps": detail.hps,
-                                        "jenis_pengadaan": detail.jenis_pengadaan,
-                                        "tahap_saat_ini": detail.tahap_saat_ini,
-                                        "is_prakualifikasi": detail.is_prakualifikasi,
-                                        "kbli_code": kbli_code,
-                                        "kbli_description": detail.kbli_description,
-                                        "is_it_priority": pscore.is_it_priority,
-                                        "priority_score": pscore.priority_score,
-                                        "url_pengumuman": detail.url_pengumuman,
-                                        "requirement_text": detail.requirement_text,
-                                        "jadwal_json": detail.jadwal_json,
-                                        "syarat_kualifikasi": detail.syarat_kualifikasi,
-                                        "peserta_count": detail.peserta_count,
-                                        "lokasi_pekerjaan": detail.lokasi_pekerjaan,
-                                        "metode_pengadaan": detail.metode_pengadaan,
-                                        "tahun_anggaran": detail.tahun_anggaran,
-                                        "satuan_kerja_detail": detail.satuan_kerja_detail,
-                                    },
-                                )
+                                try:
+                                    tender_obj, _ = await _update_or_create(
+                                        kode_instansi=detail.kode_instansi,
+                                        id_lelang=detail.id_lelang,
+                                        defaults={
+                                            "nama_paket": detail.nama_paket[:500],
+                                            "instansi": detail.instansi[:200],
+                                            "hps": detail.hps,
+                                            "jenis_pengadaan": detail.jenis_pengadaan[:200],
+                                            "tahap_saat_ini": detail.tahap_saat_ini[:200],
+                                            "is_prakualifikasi": detail.is_prakualifikasi,
+                                            "kbli_code": kbli_code[:10] if kbli_code else "",
+                                            "kbli_description": detail.kbli_description[:300],
+                                            "is_it_priority": pscore.is_it_priority,
+                                            "priority_score": pscore.priority_score,
+                                            "url_pengumuman": detail.url_pengumuman,
+                                            "requirement_text": detail.requirement_text,
+                                            "jadwal_json": detail.jadwal_json,
+                                            "syarat_kualifikasi": detail.syarat_kualifikasi,
+                                            "peserta_count": detail.peserta_count,
+                                            "lokasi_pekerjaan": detail.lokasi_pekerjaan,
+                                            "metode_pengadaan": detail.metode_pengadaan[:200],
+                                            "tahun_anggaran": detail.tahun_anggaran[:20],
+                                            "satuan_kerja_detail": detail.satuan_kerja_detail[:300],
+                                        },
+                                    )
+                                except Exception as save_err:
+                                    if "500" in str(save_err) or "too long" in str(save_err).lower():
+                                        logger.warning("[{}/{}] DB column length limitation hit, truncating lokasi_pekerjaan...", kode, detail.id_lelang)
+                                        tender_obj, _ = await _update_or_create(
+                                            kode_instansi=detail.kode_instansi,
+                                            id_lelang=detail.id_lelang,
+                                            defaults={
+                                                "nama_paket": detail.nama_paket[:500],
+                                                "instansi": detail.instansi[:200],
+                                                "hps": detail.hps,
+                                                "jenis_pengadaan": detail.jenis_pengadaan[:200],
+                                                "tahap_saat_ini": detail.tahap_saat_ini[:200],
+                                                "is_prakualifikasi": detail.is_prakualifikasi,
+                                                "kbli_code": kbli_code[:10] if kbli_code else "",
+                                                "kbli_description": detail.kbli_description[:300],
+                                                "is_it_priority": pscore.is_it_priority,
+                                                "priority_score": pscore.priority_score,
+                                                "url_pengumuman": detail.url_pengumuman,
+                                                "requirement_text": detail.requirement_text,
+                                                "jadwal_json": detail.jadwal_json,
+                                                "syarat_kualifikasi": detail.syarat_kualifikasi,
+                                                "peserta_count": detail.peserta_count,
+                                                "lokasi_pekerjaan": detail.lokasi_pekerjaan[:490],
+                                                "metode_pengadaan": detail.metode_pengadaan[:200],
+                                                "tahun_anggaran": detail.tahun_anggaran[:20],
+                                                "satuan_kerja_detail": detail.satuan_kerja_detail[:300],
+                                            },
+                                        )
+                                    else:
+                                        raise
                                 await _sync_participants(
                                     tender_obj,
                                     detail.participants,

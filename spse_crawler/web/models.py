@@ -42,7 +42,7 @@ class TenderResult(models.Model):
     jadwal_json = models.JSONField(default=list, blank=True, help_text="Array of jadwal tahapan: [{no, tahap, mulai, sampai, perubahan}]")
     syarat_kualifikasi = models.TextField(default="", blank=True, help_text="Cleaned qualification requirement text from detail page")
     peserta_count = models.IntegerField(default=0, db_index=True, help_text="Number of participants from peserta page")
-    lokasi_pekerjaan = models.CharField(max_length=500, default="", blank=True, help_text="Work location from detail page")
+    lokasi_pekerjaan = models.TextField(default="", blank=True, help_text="Work location from detail page")
     tahun_anggaran = models.CharField(max_length=20, default="", blank=True, help_text="Budget year, e.g. '2026'")
     satuan_kerja_detail = models.CharField(max_length=300, default="", blank=True, help_text="Satuan kerja from detail page")
 

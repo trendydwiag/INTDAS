@@ -587,7 +587,14 @@ async def _execute_single_resync(tender_id: int) -> tuple[bool, str, TenderResul
         if detail.kbli_description:
             t.kbli_description = detail.kbli_description
         t.scraped_at = dj_timezone.now()
-        await sync_to_async(t.save)()
+        try:
+            await sync_to_async(t.save)()
+        except Exception as save_err:
+            if "500" in str(save_err) or "too long" in str(save_err).lower():
+                t.lokasi_pekerjaan = (t.lokasi_pekerjaan or "")[:490]
+                await sync_to_async(t.save)()
+            else:
+                raise
 
         if detail.participants:
             await sync_to_async(sync_tender_participants)(
@@ -945,7 +952,14 @@ async def _execute_delta_crawl(tender_ids: list[int], workers: int, instansi_inp
                                 t.kbli_code = detail.kbli_code
                             if detail.kbli_description:
                                 t.kbli_description = detail.kbli_description
-                            await _save_obj(t)
+                            try:
+                                await _save_obj(t)
+                            except Exception as save_err:
+                                if "500" in str(save_err) or "too long" in str(save_err).lower():
+                                    t.lokasi_pekerjaan = (t.lokasi_pekerjaan or "")[:490]
+                                    await _save_obj(t)
+                                else:
+                                    raise
 
                             if detail.participants:
                                 await _sync_participants(

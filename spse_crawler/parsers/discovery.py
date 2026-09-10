@@ -102,8 +102,13 @@ class DiscoveryParser:
             section="lelang",
             tahun=self._settings.tahun_anggaran,
         )
-        resp = await self._http.get(url)
-        html = resp.text
+        html = ""
+        try:
+            await self._http.warm_instansi_session(instansi.kode)
+            resp = await self._http.get(url)
+            html = resp.text
+        except (CloudflareBlockError, Exception) as exc:
+            logger.debug("[{}] httpx main page failed or Cloudflare blocked: {}", instansi.kode, exc)
 
         match = _CSRF_PATTERN.search(html)
         if match:
@@ -151,15 +156,27 @@ class DiscoveryParser:
             finally:
                 await page2.close()
 
-            await context.close()
-
             match = _CSRF_PATTERN.search(content)
             if match:
                 token = match.group(1)
+                # Inject Playwright Cloudflare cookies into httpx client
+                try:
+                    for c in await context.cookies():
+                        self._http.client.cookies.set(
+                            c["name"],
+                            c["value"],
+                            domain=c.get("domain") or ".inaproc.id",
+                            path=c.get("path", "/"),
+                        )
+                except Exception as c_err:
+                    logger.warning("[{}] Could not sync Playwright cookies to httpx: {}", instansi.kode, c_err)
+
                 logger.info("[{}] CSRF token extracted via Playwright: {}…", instansi.kode, token[:12])
+                await context.close()
                 return token
             else:
                 logger.warning("[{}] Playwright got page but no authenticityToken found", instansi.kode)
+            await context.close()
         finally:
             await pw.stop()
 
@@ -214,34 +231,34 @@ class DiscoveryParser:
             return re.sub(r"<[^>]+>", "", str(val)).strip() if val else ""
 
         # [0] = ID / Kode lelang
-        id_lelang = _clean(row[0])
+        id_lelang = _clean(row[0])[:50]
         if not id_lelang or id_lelang == "None":
             return None
 
-        # [1] = Nama Paket
-        nama_paket = _clean(row[1]) if len(row) > 1 else ""
+        # [1] = Nama Paket — capped to 500 chars
+        nama_paket = _clean(row[1])[:500] if len(row) > 1 else ""
 
-        # [2] = Instansi
-        instansi = _clean(row[2]) if len(row) > 2 else ""
+        # [2] = Instansi — capped to 200 chars
+        instansi = _clean(row[2])[:200] if len(row) > 2 else ""
 
-        # [3] = Status
-        status = _clean(row[3]) if len(row) > 3 else ""
+        # [3] = Status — capped to 200 chars
+        status = _clean(row[3])[:200] if len(row) > 3 else ""
 
         # [4] = HPS — may be formatted like "660,9 M", "1,5 M", "Rp. 123.456.000"
         raw_hps = _clean(row[4]) if len(row) > 4 else "0"
         nilai_pagu = self._parse_hps_value(raw_hps)
 
-        # [5] = Kualifikasi
-        kualifikasi = _clean(row[5]) if len(row) > 5 else ""
+        # [5] = Kualifikasi — capped to 100 chars
+        kualifikasi = _clean(row[5])[:100] if len(row) > 5 else ""
 
-        # [6] = Metode
-        metode = _clean(row[6]) if len(row) > 6 else ""
+        # [6] = Metode — capped to 200 chars
+        metode = _clean(row[6])[:200] if len(row) > 6 else ""
 
-        # [7] = Evaluasi
-        evaluasi = _clean(row[7]) if len(row) > 7 else ""
+        # [7] = Evaluasi — capped to 100 chars
+        evaluasi = _clean(row[7])[:100] if len(row) > 7 else ""
 
-        # [8] = Jenis Pengadaan
-        jenis = _clean(row[8]) if len(row) > 8 else ""
+        # [8] = Jenis Pengadaan — capped to 200 chars
+        jenis = _clean(row[8])[:200] if len(row) > 8 else ""
 
         # [9] = Peserta
         raw_peserta = _clean(row[9]) if len(row) > 9 else "0"
@@ -300,6 +317,70 @@ class DiscoveryParser:
         except (ValueError, TypeError):
             return 0
 
+    async def _fetch_dt_playwright(
+        self,
+        instansi: InstansiConfig,
+        dt_url: str,
+        body: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Fetch DataTables JSON via Playwright stealth session when httpx is Cloudflare-blocked."""
+        import json
+        from spse_crawler.core.browser import PlaywrightEngine
+
+        pw = PlaywrightEngine(self._settings)
+        await pw.start()
+        try:
+            context = await pw.new_context()
+            page = await context.new_page()
+            listing_url = instansi.main_page_url(section="lelang", tahun=self._settings.tahun_anggaran)
+            await page.goto(listing_url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception:
+                pass
+
+            # Sync cookies to httpx for subsequent requests
+            try:
+                for c in await context.cookies():
+                    self._http.client.cookies.set(
+                        c["name"],
+                        c["value"],
+                        domain=c.get("domain") or ".inaproc.id",
+                        path=c.get("path", "/"),
+                    )
+            except Exception:
+                pass
+
+            # Execute POST request from within browser page context
+            js_script = """
+            async (args) => {
+                const params = new URLSearchParams();
+                for (const [key, val] of Object.entries(args.body)) {
+                    params.append(key, val);
+                }
+                const res = await fetch(args.url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01'
+                    },
+                    body: params.toString()
+                });
+                if (!res.ok) return null;
+                return await res.json();
+            }
+            """
+            result = await page.evaluate(js_script, {"url": dt_url, "body": body})
+            await page.close()
+            await context.close()
+            return result
+        except Exception as exc:
+            logger.warning("[{}] Playwright fallback for dt/lelang failed: {}", instansi.kode, exc)
+            return None
+        finally:
+            await pw.stop()
+
     async def fetch_packages(
         self,
         instansi: InstansiConfig,
@@ -330,6 +411,13 @@ class DiscoveryParser:
         page_size = self._settings.page_size
         skipped_count = 0
 
+        headers = {
+            "Referer": instansi.main_page_url(section="lelang", tahun=self._settings.tahun_anggaran),
+            "Origin": "https://spse.inaproc.id",
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+
         while True:
             body = self._build_dt_body(
                 token=token,
@@ -337,14 +425,24 @@ class DiscoveryParser:
                 start=start,
                 length=page_size,
             )
-            resp = await self._http.post(dt_url, data=body)
+            data = None
             try:
+                resp = await self._http.post(dt_url, data=body, headers=headers)
                 data = resp.json()
+            except CloudflareBlockError:
+                logger.warning("[{}] Cloudflare blocked POST /dt/lelang via httpx. Trying Playwright fallback...", instansi.kode)
+                data = await self._fetch_dt_playwright(instansi, dt_url, body)
+                if data is None:
+                    logger.warning("[{}] Cloudflare blocked both httpx and Playwright for dt/lelang", instansi.kode)
+                    break
             except Exception as exc:
-                raise ParsingError(
-                    url=dt_url,
-                    detail=f"Response is not valid JSON: {exc}",
-                ) from exc
+                logger.warning("[{}] Error fetching dt/lelang at offset {}: {}. Trying Playwright...", instansi.kode, start, exc)
+                data = await self._fetch_dt_playwright(instansi, dt_url, body)
+                if data is None:
+                    break
+
+            if not data or not isinstance(data, dict):
+                break
 
             rows: list[list[Any]] = data.get("data", [])
             if not rows:
