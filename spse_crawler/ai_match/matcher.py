@@ -405,16 +405,23 @@ def run_match(tender_id: int, company_id: int, force: bool = False) -> dict:
         logger.error("[AI] LLM call failed: {}", exc)
         is_fallback = True
         fallback_reason = f"LLM call failed: {exc}"
-        result = {
-            "fit_score": 0,
-            "eligibility_status": "NOT_READY",
-            "mandatory_passed": False,
-            "blockers": [f"AI analysis failed: {exc}"],
-            "missing_requirements": [],
-            "recommended_actions": ["Coba jalankan analisis ulang."],
-            "summary": f"AI analysis failed: {exc}",
-            "criteria": [],
-        }
+        try:
+            from .providers import RuleBasedProvider
+            rule_provider = RuleBasedProvider()
+            raw_fallback = rule_provider.chat(SYSTEM_PROMPT, user_prompt)
+            result = parse_llm_response(raw_fallback)
+        except Exception as fb_exc:
+            logger.error("[AI] RuleBased fallback also failed: {}", fb_exc)
+            result = {
+                "fit_score": 0,
+                "eligibility_status": "NOT_READY",
+                "mandatory_passed": False,
+                "blockers": [f"AI analysis failed: {exc}"],
+                "missing_requirements": [],
+                "recommended_actions": ["Coba jalankan analisis ulang."],
+                "summary": f"AI analysis failed: {exc}",
+                "criteria": [],
+            }
 
     # Enforce Deterministic Hard Gates
     result = _enforce_deterministic_hard_gates(result, tender, company, qualifications)
